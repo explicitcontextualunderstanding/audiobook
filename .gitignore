@@ -54,3 +54,4 @@ Thumbs.db
 
 # Large files that shouldn't be tracked
 *.epub.bak
+*.epub
