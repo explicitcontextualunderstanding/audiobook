@@ -5,9 +5,7 @@ import torch
 import argparse
 from tqdm import tqdm
 from pathlib import Path
-import ebooklib
-from ebooklib import epub
-from bs4 import BeautifulSoup
+from PyPDF2 import PdfReader
 from pydub import AudioSegment
 from nltk.tokenize import sent_tokenize
 import nltk
@@ -20,25 +18,21 @@ try:
 except LookupError:
     nltk.download('punkt')
 
-def extract_text_from_epub(epub_path):
-    """Extract text from an EPUB file."""
-    print(f"Extracting text from {epub_path}...")
+def extract_text_from_pdf(pdf_path):
+    """Extract text from a PDF file."""
+    print(f"Extracting text from {pdf_path}...")
     
-    book = epub.read_epub(epub_path)
+    reader = PdfReader(pdf_path)
     text = ""
     
-    for item in tqdm(list(book.get_items_of_type(ebooklib.ITEM_DOCUMENT)), desc="Processing chapters"):
-        # Get content
-        content = item.get_content().decode('utf-8')
+    for i, page in enumerate(tqdm(reader.pages, desc="Processing pages")):
+        page_text = page.extract_text()
         
-        # Use BeautifulSoup to parse HTML and extract text
-        soup = BeautifulSoup(content, 'html.parser')
-        chapter_text = soup.get_text()
+        # Clean page headers/footers
+        page_text = re.sub(r'Page \d+ of \d+', '', page_text)
+        page_text = re.sub(r'^\s*\d+\s*$', '', page_text, flags=re.MULTILINE)
         
-        # Clean the text
-        chapter_text = re.sub(r'\s+', ' ', chapter_text).strip()
-        
-        text += chapter_text + "\n\n"
+        text += page_text + "\n"
     
     return text
 
@@ -103,8 +97,8 @@ def combine_audio_files(audio_files, output_path):
     print(f"Audiobook saved to {output_path}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate an audiobook from an EPUB using Sesame CSM")
-    parser.add_argument("--epub", required=True, help="Path to the EPUB file")
+    parser = argparse.ArgumentParser(description="Generate an audiobook from a PDF using Sesame CSM")
+    parser.add_argument("--pdf", required=True, help="Path to the PDF file")
     parser.add_argument("--output", default="audiobook_sesame.mp3", help="Output audiobook file path")
     parser.add_argument("--temp_dir", default="temp_audio_sesame", help="Directory for temporary audio files")
     parser.add_argument("--chunk_size", type=int, default=1000, help="Maximum characters per chunk")
@@ -114,7 +108,7 @@ def main():
     os.makedirs(args.temp_dir, exist_ok=True)
     
     # Extract and preprocess text
-    text = extract_text_from_epub(args.epub)
+    text = extract_text_from_pdf(args.pdf)
     chunks = preprocess_text(text, args.chunk_size)
     
     # Load CSM model

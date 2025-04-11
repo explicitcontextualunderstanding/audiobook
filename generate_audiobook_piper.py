@@ -5,9 +5,7 @@ import sys
 import argparse
 import subprocess
 import re
-import ebooklib
-from ebooklib import epub
-from bs4 import BeautifulSoup
+from PyPDF2 import PdfReader
 from tqdm import tqdm
 import nltk
 from nltk.tokenize import sent_tokenize
@@ -16,25 +14,21 @@ from pydub import AudioSegment
 # Download NLTK data
 nltk.download('punkt', quiet=True)
 
-def extract_text_from_epub(epub_path):
-    """Extract text from an EPUB file."""
-    print(f"Extracting text from {epub_path}...")
+def extract_text_from_pdf(pdf_path):
+    """Extract text from a PDF file."""
+    print(f"Extracting text from {pdf_path}...")
     
-    book = epub.read_epub(epub_path)
+    reader = PdfReader(pdf_path)
     text = ""
     
-    for item in tqdm(list(book.get_items_of_type(ebooklib.ITEM_DOCUMENT)), desc="Processing chapters"):
-        # Get content
-        content = item.get_content().decode('utf-8')
+    for i, page in enumerate(tqdm(reader.pages, desc="Processing pages")):
+        page_text = page.extract_text()
         
-        # Use BeautifulSoup to parse HTML and extract text
-        soup = BeautifulSoup(content, 'html.parser')
-        chapter_text = soup.get_text()
+        # Clean up page headers, footers, page numbers, etc.
+        page_text = re.sub(r'Page \d+ of \d+', '', page_text)
+        page_text = re.sub(r'^\s*\d+\s*$', '', page_text, flags=re.MULTILINE)
         
-        # Clean the text
-        chapter_text = re.sub(r'\s+', ' ', chapter_text).strip()
-        
-        text += chapter_text + "\n\n"
+        text += page_text + "\n"
     
     return text
 
@@ -112,8 +106,8 @@ def combine_audio_files(audio_files, output_file):
     print(f"Combined audiobook saved to {output_file}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate an audiobook from an EPUB using Piper TTS")
-    parser.add_argument("--epub", required=True, help="Path to the EPUB file")
+    parser = argparse.ArgumentParser(description="Generate an audiobook from a PDF using Piper TTS")
+    parser.add_argument("--pdf", required=True, help="Path to the PDF file")
     parser.add_argument("--output", default="audiobook.mp3", help="Output audiobook file path")
     parser.add_argument("--model", default="en_US-lessac-medium", help="Piper voice model to use")
     parser.add_argument("--temp_dir", default="temp_audio", help="Directory for temporary audio files")
@@ -123,8 +117,8 @@ def main():
     # Create temporary directory
     os.makedirs(args.temp_dir, exist_ok=True)
     
-    # Extract text from EPUB
-    text = extract_text_from_epub(args.epub)
+    # Extract text from PDF
+    text = extract_text_from_pdf(args.pdf)
     
     # Split text into chunks
     chunks = split_text_into_chunks(text, args.chunk_size)

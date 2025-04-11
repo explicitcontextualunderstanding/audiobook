@@ -21,29 +21,45 @@ cd jetson-containers
 
 ### 1.3 Prepare Data Directory
 ```bash
-# Create a directory for your PDF and output files
+# Create directories for your data and ePub files
 mkdir -p ~/audiobook_data
-# Copy your PDF to this directory
-cp ~/learning_with_ai.pdf ~/audiobook_data/
+mkdir -p ~/audiobook
+
+# Copy your ePub file to the books directory
+cp ~/learning_ai.epub ~/audiobook/
 ```
 
 ## 2. Approach 1: Generating Audiobook with Piper (via jetson-containers)
 
 ### 2.1 Check Available Piper Models
 ```bash
-# Show details about the piper container
-./jetson-containers show piper
+# Show details about the piper-tts container (note the correct package name)
+./jetson-containers show piper-tts
 ```
 
 ### 2.2 Run the Piper Container
 ```bash
-# Run the piper container with volume mount for data
-./jetson-containers run --volume ~/audiobook_data:/data --workdir /data piper
+# Run the piper-tts container with correct volume mounts
+# IMPORTANT: Volume arguments must come BEFORE the container name
+./jetson-containers run --volume ~/audiobook_data:/audiobook_data \
+  --volume ~/audiobook:/books \
+  --workdir /audiobook_data $(./autotag piper-tts)
 ```
 
-### 2.3 Create PDF Processing Script
+### 2.3 Create ePub Processing Script and Test Piper
 
-Inside the container, create a Python script to process the PDF and generate audio:
+Inside the container, first test Piper with the included test voice model:
+
+```bash
+# Test Piper with a simple sentence (note: Piper reads from stdin)
+echo "This is a test of the Piper text to speech system." > test.txt
+cat test.txt | piper -m /opt/piper/etc/test_voice.onnx -f /audiobook_data/test.wav
+
+# Install ffmpeg and convert to MP3 format
+apt-get update && apt-get install -y ffmpeg
+ffmpeg -i /audiobook_data/test.wav -y -codec:a libmp3lame -qscale:a 2 /audiobook_data/test.mp3
+
+# Now create the ePub processing script
 
 ```bash
 # Create the script
@@ -214,23 +230,43 @@ pip install PyPDF2 nltk tqdm pydub
 
 ### 2.5 Run the Audiobook Generation Script
 ```bash
-# List available Piper voice models
-ls -la /opt/piper/voices
-
-# Run the script with a specific voice model
-python generate_audiobook_piper.py --pdf /data/learning_with_ai.pdf --output /data/audiobook_piper.mp3 --model en_US-lessac-medium
+# Create necessary directories
+mkdir -p /audiobook_data/temp_audio_piper
+# Run the script with the test voice model
+python /books/generate_audiobook_piper_epub.py \
+  --epub /books/learning_ai.epub \
+  --output /audiobook_data/audiobook_piper.mp3 \
+  --model /opt/piper/etc/test_voice.onnx \
+  --temp_dir /audiobook_data/temp_audio_piper
 ```
 
 ### 2.6 Monitor and Manage the Process
 ```bash
 # To check progress
-ls -la /data/temp_audio | wc -l
-
-# To resume if interrupted
-python generate_audiobook_piper.py --pdf /data/learning_with_ai.pdf --output /data/audiobook_piper.mp3
+ls -la /audiobook_data/temp_audio_piper | wc -l
+# To resume if interrupted, just run the same command again
+python /books/generate_audiobook_piper_epub.py \
+  --epub /books/learning_ai.epub \
+  --output /audiobook_data/audiobook_piper.mp3 \
+  --model /opt/piper/etc/test_voice.onnx \
+  --temp_dir /audiobook_data/temp_audio_piper
 ```
 
-## 3. Approach 2: Generating Audiobook with Sesame CSM
+## 3. Understanding Container and Host File Locations
+
+Important path mappings:
+
+| Inside Container | On Jetson Host |
+|-----------------|----------------|
+| `/audiobook_data` | `~/audiobook_data` |
+| `/books` | `~/audiobook` |
+| `/data` | `~/jetson-containers/data` (default mapping) |
+
+When running commands:
+- Use container paths (like `/audiobook_data`) when inside the container
+- Use host paths (like `~/audiobook_data`) when on the Jetson host
+
+Note: Files saved to `/data` inside the container will be available at `~/jetson-containers/data` on the host, not at `~/audiobook_data`.
 
 ### 3.1 Set Up Environment for Sesame CSM
 ```bash
@@ -434,7 +470,7 @@ source ~/sesame_project/venv/bin/activate
 
 # Run the script
 cd ~/sesame_project
-python generate_audiobook_sesame.py --pdf ~/audiobook_data/learning_with_ai.pdf --output ~/audiobook_data/audiobook_sesame.mp3
+python generate_audiobook_sesame_epub.py --epub ~/audiobook/learning_ai.epub --output ~/audiobook_data/audiobook_sesame.mp3
 ```
 
 ## 4. Performance Optimization and Monitoring
@@ -529,8 +565,10 @@ For Sesame CSM, you can modify voice parameters:
 # Adjust voice parameters (example)
 audio = model.generate(
     text=text,
-    voice_preset="calm", 
-    speaking_rate=0.95
+    voice_preset="calm",  # Options: "default", "calm", "excited", "serious"
+    speaking_rate=0.95,   # 1.0 is normal speed, lower is slower
+    pitch_shift=0.0,      # Values between -1.0 and 1.0 for pitch adjustment
+    energy_shift=0.0      # Values between -1.0 and 1.0 for volume/energy
 )
 ```
 
@@ -545,20 +583,36 @@ audio = model.generate(
 4. Process fewer chunks at a time
 ```
 
-### 7.2 Installation Issues
+### 7.2 Piper Command Syntax
+```bash
+# Using stdin for input (recommended approach)
+cat input.txt | piper -m /opt/piper/etc/test_voice.onnx -f output.wav
+
+# Alternative syntax
+piper -m /opt/piper/etc/test_voice.onnx --output_file output.wav < input.txt
+
+# Converting to MP3 format afterward
+ffmpeg -i output.wav -codec:a libmp3lame -qscale:a 2 output.mp3
 ```
+
+### 7.3 Installation Issues
+```bash
 # If pip fails to install packages
 sudo apt update
-sudo apt install -y build-essential python3-dev
-
-# If PyTorch fails to install
-pip install torch==1.10.0+cpu -f https://download.pytorch.org/whl/torch_stable.html
+sudo apt install -y python3-dev build-essential
 
 # For audio library issues
 sudo apt install -y libasound2-dev portaudio19-dev libportaudio2 libportaudiocpp0 ffmpeg libav-tools
+
+# If you encounter SSL certificate errors during package downloads
+pip install --trusted-host pypi.org --trusted-host files.pythonhosted.org <package_name>
+
+# For CUDA-related package issues
+export TORCH_CUDA_ARCH_LIST="5.3;6.2;7.2"
+pip install torch==1.10.0+cu113 -f https://download.pytorch.org/whl/cu113/torch_stable.html
 ```
 
-### 7.3 Docker or Container Issues
+### 7.4 Docker or Container Issues
 ```
 # If container fails to start
 sudo systemctl restart docker
