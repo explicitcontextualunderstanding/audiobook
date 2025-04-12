@@ -298,6 +298,28 @@ python generate_audiobook_sesame_epub.py \
   --output /audiobook_data/audiobook_sesame.mp3
 ```
 
+### 4.4 Using Docker Container for Sesame CSM (Recommended)
+
+For a more streamlined experience, similar to the Piper TTS approach, you can use the included Docker container for Sesame CSM:
+
+```bash
+# Build the Sesame TTS Docker container (first time only)
+cd ~/audiobook
+docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
+
+# Run the container with volume mounts
+docker run --runtime nvidia -it --rm \
+  --volume ~/audiobook_data:/audiobook_data \
+  --volume ~/audiobook:/books \
+  --workdir /audiobook_data \
+  sesame-tts
+
+# Generate an audiobook using Sesame
+python /books/generate_audiobook_sesame.py \
+  --input /books/your_book.epub \
+  --output /audiobook_data/audiobook_sesame.mp3 \
+  --voice_preset "calm"
+
 ## 5. Voice Model Selection Guide
 
 | Voice | Language | Gender | Style | Quality | File Path | Good For |

@@ -71,42 +71,60 @@ elif [ "$METHOD" == "sesame" ]; then
     echo "    Starting audiobook generation using Sesame CSM  "
     echo "===================================================="
     
+    # Check if Docker is installed
+    if ! command -v docker &> /dev/null; then
+        echo "Docker is not installed. Please install Docker first."
+        echo "Visit https://docs.docker.com/engine/install/ for installation instructions."
+        exit 1
+    fi
+
     # Setup environment for Sesame CSM
     echo "Setting up environment for Sesame CSM..."
     sudo apt update
     sudo apt install -y python3-venv python3-pip ffmpeg libsndfile1
     
-    # Create project directory
-    mkdir -p ~/sesame_project
-    cd ~/sesame_project
-    
-    # Create and activate virtual environment
-    python3 -m venv venv
-    source venv/bin/activate
-    
-    # Install Python dependencies
-    echo "Installing dependencies (this may take a while)..."
-    pip install --upgrade pip
-    pip install PyPDF2 pdfminer.six nltk tqdm pydub transformers huggingface_hub numpy scipy librosa soundfile psutil torch ebooklib beautifulsoup4
-    
-    # Clone the repository if it doesn't exist
-    if [ ! -d ~/sesame_project/csm ]; then
-        echo "Cloning Sesame CSM repository..."
-        git clone https://github.com/SesameAILabs/csm.git
-        cd csm
-        pip install -e .
+    # Check if sesame-tts image exists
+    if ! docker image inspect sesame-tts &>/dev/null; then
+        echo "Sesame TTS image not found. Building it now (this may take a while)..."
+        # Create a temporary Dockerfile
+        TEMP_DIR=$(mktemp -d)
+        cat > $TEMP_DIR/Dockerfile <<EOL
+FROM nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
+
+RUN pip install PyPDF2 nltk tqdm pydub ebooklib beautifulsoup4 psutil transformers huggingface_hub numpy scipy librosa soundfile torch
+
+# Clone and install CSM
+RUN git clone https://github.com/SesameAILabs/csm.git && \
+    cd csm && \
+    pip install -e .
+
+# Download the model
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
+
+WORKDIR /audiobook_data
+EOL
         
-        # Download the model
-        echo "Downloading the CSM model (this may take a while)..."
-        python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
-        cd ..
+        # Build the Docker image
+        docker build -t sesame-tts $TEMP_DIR
+        rm -rf $TEMP_DIR
     fi
     
+    # Run the Sesame TTS container
+    echo "Starting Sesame TTS container..."
     echo
-    echo "Now run:"
-    echo "source ~/sesame_project/venv/bin/activate"
-    echo "python ~/audiobook/generate_audiobook_sesame.py --input ~/audiobook/$BOOK_FILENAME --output ~/audiobook_data/audiobook_sesame.mp3 --voice_preset 'calm'"
+    echo "Inside the container, the script will run automatically."
+    echo "Your audiobook will be available at: ~/audiobook_data/audiobook_sesame.mp3"
+    echo
     
+    docker run --runtime nvidia -it --rm \
+        --volume ~/audiobook_data:/audiobook_data \
+        --volume ~/audiobook:/books \
+        --workdir /audiobook_data \
+        sesame-tts python /books/generate_audiobook_sesame.py --input /books/$BOOK_FILENAME --output /audiobook_data/audiobook_sesame.mp3 --voice_preset calm
+    
+    echo "Audiobook generation complete!"
+    echo "Your audiobook is available at: ~/audiobook_data/audiobook_sesame.mp3"
+
 else
     echo "Unknown method: $METHOD"
     echo "Valid methods are: piper, sesame"
