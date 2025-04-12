@@ -1,0 +1,44 @@
+FROM dustynv/l4t-pytorch:r35.4.1
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    libsndfile1 \
+    python3-pip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+RUN pip3 install --no-cache-dir \
+    PyPDF2 \
+    pdfminer.six \
+    nltk \
+    tqdm \
+    pydub \
+    transformers \
+    huggingface_hub \
+    numpy \
+    scipy \
+    librosa \
+    soundfile \
+    psutil \
+    ebooklib \
+    beautifulsoup4
+
+# Download NLTK data
+RUN python3 -c "import nltk; nltk.download('punkt')"
+
+# Clone and install Sesame CSM
+WORKDIR /opt
+RUN git clone https://github.com/SesameAILabs/csm.git && \
+    cd csm && \
+    pip install -e .
+
+# Download the model
+RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
+
+# Create directories for mounting volumes
+RUN mkdir -p /audiobook_data /books
+
+# Set working directory
+WORKDIR /audiobook_data

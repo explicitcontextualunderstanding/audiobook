@@ -1,0 +1,14 @@
+name: sesame-tts
+description: Sesame CSM text-to-speech engine for audiobook generation
+license: MIT
+maintainer: https://github.com/explicitcontextualunderstanding
+tags:
+  - text-to-speech
+  - audiobook
+  - speech synthesis
+  - ai
+repos:
+  - name: csm
+    url: https://github.com/SesameAILabs/csm.git
+    branch: main
+container: Dockerfile
