@@ -17,7 +17,7 @@ The plan supports both ePub and PDF formats, with ePub being the recommended for
 ### 1.2 Clone the Repository and Install Dependencies
 ```bash
 # Clone this repository
-git clone https://github.com/kieranlal/audiobook.git
+git clone https://github.com/explicitcontextualunderstanding/audiobook.git
 cd audiobook
 
 # Install required dependencies
@@ -47,17 +47,24 @@ For convenience, you can use the included `quickstart.sh` script to automaticall
 chmod +x quickstart.sh
 
 # Run the script with your book file (default uses Piper TTS)
-./quickstart.sh --input your_book.epub --voice lessac
+./quickstart.sh -i learning_ai.epub -v lessac
 
 # For Sesame TTS
-./quickstart.sh --input your_book.epub --engine sesame
+./quickstart.sh -i learning_ai.epub -e sesame
 ```
 
 The quickstart script handles:
 - Installing dependencies
-- Setting up the right environment
-- Running the appropriate audiobook generation script
+- Setting up the right environment (launches the Piper container when using Piper TTS)
+- Running the appropriate audiobook generation script inside the container
 - Applying chapter markers to the final audio file
+- Managing container volume mounts and cleanup automatically
+
+Note: When using the `-e piper` (default) option, the script automatically:
+1. Launches the jetson-containers Piper container with the correct volume mounts
+2. Executes the generation script inside the container
+3. Manages file permissions between the container and host
+4. Cleans up the container when processing is complete
 
 ## 2. Approach 1: Generating Audiobook with Piper (via jetson-containers)
 
