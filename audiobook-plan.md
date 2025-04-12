@@ -102,9 +102,29 @@ ffmpeg -i /audiobook_data/test.wav -y -codec:a libmp3lame -qscale:a 2 /audiobook
 
 ### 2.4 Install Required Python Packages in the Container
 ```bash
-# Install required packages
+# Install required packages INSIDE the container
 pip install PyPDF2 nltk tqdm pydub ebooklib beautifulsoup4
 ```
+
+**Important:** Make sure to run this command inside the container before attempting to run any of the scripts. If you get a "ModuleNotFoundError" message like "No module named 'PyPDF2'", it means you need to install the dependencies first.
+
+To verify successful installation, you can run:
+```bash
+# Verify the packages are installed
+pip list | grep -E "PyPDF2|nltk|tqdm|pydub|ebooklib|beautifulsoup4"
+```
+
+**Note for Future Improvements:** For a more streamlined experience, these dependencies could be included directly in the Piper container's Dockerfile. This would eliminate the need to manually install packages each time you launch the container. If you're maintaining your own fork of the jetson-containers repository, consider adding these requirements to the piper-tts container definition.
+
+**How to Modify the Piper Dockerfile:**
+
+If you want to create a custom Piper container with the required dependencies, you can modify the existing Dockerfile located at:
+
+```
+<path_to_jetson_containers_repo>/containers/piper-tts/Dockerfile
+```
+
+Add the necessary `RUN` commands to install the Python packages using `pip` and any other system-level dependencies required. After modifying, build the Docker image and use it for your audiobook generation tasks.
 
 ### 2.5 Using the Audiobook Generation Scripts
 
@@ -115,6 +135,26 @@ The repository contains several Python scripts:
 3. `generate_audiobook_sesame.py` - Main script for generating audiobooks using Sesame CSM (works with both EPUB and PDF)
 4. `generate_audiobook_sesame_epub.py` - Specialized script for EPUB files using Sesame CSM (optimized for EPUB with simpler parameters)
 5. `extract_chapters.py` - Utility for extracting chapter information from books
+
+**Important:** All Python scripts for Piper TTS should be executed INSIDE the container. Do NOT exit the container to run these scripts. The container has all the necessary dependencies and access to the Piper TTS models.
+
+**Script Location:** When you launch the container using the quickstart.sh script or manually, the scripts are automatically mounted inside the container at:
+```
+/books/
+```
+
+To execute a script inside the container, use the full path to the script:
+```bash
+# List the available scripts
+ls -la /books/*.py
+
+# Execute a specific script (example)
+python /books/generate_audiobook_piper.py --input /books/your_book.epub [other options]
+```
+
+If you used the quickstart.sh script, you're already inside the container with a prompt similar to `root@amazon1148:/audiobook_data#` and should run all commands from there.
+
+If you manually launched the container with `jetson-containers run`, you should execute all Python scripts from within that container session.
 
 **Difference between general and EPUB-specific scripts:**
 - General scripts (`generate_audiobook_piper.py`, `generate_audiobook_sesame.py`) support both EPUB and PDF files with more configuration options
