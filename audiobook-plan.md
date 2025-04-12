@@ -303,22 +303,67 @@ python generate_audiobook_sesame_epub.py \
 For a more streamlined experience, similar to the Piper TTS approach, you can use the included Docker container for Sesame CSM:
 
 ```bash
-# Build the Sesame TTS Docker container (first time only)
-cd ~/audiobook
-docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
+# Option 1: Using the quickstart.sh script (recommended)
+./quickstart.sh your_book.epub sesame
 
-# Run the container with volume mounts
+# Option 2: Manual Docker approach
+# Check if sesame-tts image exists, build if not
+if ! docker image inspect sesame-tts &>/dev/null; then
+    echo "Building Sesame TTS Docker container..."
+    
+    # You can either use the included Dockerfile
+    cd ~/audiobook
+    docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
+    
+    # Or create a temporary Dockerfile as the quickstart script does
+    TEMP_DIR=$(mktemp -d)
+    cat > $TEMP_DIR/Dockerfile <<EOL
+FROM nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
+
+RUN pip install PyPDF2 nltk tqdm pydub ebooklib beautifulsoup4 psutil transformers huggingface_hub numpy scipy librosa soundfile torch
+
+# Clone and install CSM
+RUN git clone https://github.com/SesameAILabs/csm.git && \
+    cd csm && \
+    pip install -e .
+
+# Download the model
+RUN python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
+
+WORKDIR /audiobook_data
+EOL
+    
+    docker build -t sesame-tts $TEMP_DIR
+    rm -rf $TEMP_DIR
+fi
+
+# Run the container with direct script execution
+docker run --runtime nvidia --rm \
+  --volume ~/audiobook_data:/audiobook_data \
+  --volume ~/audiobook:/books \
+  --workdir /audiobook_data \
+  sesame-tts python /books/generate_audiobook_sesame.py \
+  --input /books/your_book.epub \
+  --output /audiobook_data/audiobook_sesame.mp3 \
+  --voice_preset "calm"
+
+# Alternatively, run the container in interactive mode
 docker run --runtime nvidia -it --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
   --workdir /audiobook_data \
   sesame-tts
+```
 
-# Generate an audiobook using Sesame
+When using the interactive mode, you can then run commands inside the container:
+
+```bash
+# Generate an audiobook using Sesame (inside container)
 python /books/generate_audiobook_sesame.py \
   --input /books/your_book.epub \
   --output /audiobook_data/audiobook_sesame.mp3 \
   --voice_preset "calm"
+```
 
 ## 5. Voice Model Selection Guide
 
