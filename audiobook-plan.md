@@ -64,7 +64,7 @@ The quickstart script handles:
 - Applying chapter markers to the final audio file
 - Managing container volume mounts and cleanup automatically
 
-Note: When using the `-e piper` (default) option, the script automatically:
+Note: When using the `piper` engine option, the script automatically:
 1. Launches the jetson-containers Piper container with the correct volume mounts
 2. Executes the generation script inside the container
 3. Manages file permissions between the container and host
@@ -159,6 +159,37 @@ python generate_audiobook_piper.py \
   --temp_dir /audiobook_data/temp_audio_piper \
   --chapter_range 1-10
 ```
+
+### 2.7 Generating Per-Chapter Audio Files
+
+To generate separate audio files for each chapter (rather than one combined audiobook):
+
+```bash
+# Create a directory specifically for individual chapter audio files
+mkdir -p /audiobook_data/individual_chapters
+
+# Generate per-chapter audio files using the --per_chapter flag
+python generate_audiobook_piper.py \
+  --input /books/your_book.epub \
+  --output_dir /audiobook_data/individual_chapters \
+  --model /opt/piper/voices/en/en_US-lessac-medium.onnx \
+  --temp_dir /audiobook_data/temp_audio_piper \
+  --per_chapter
+
+# For EPUB files using the specialized script
+python generate_audiobook_piper_epub.py \
+  --input /books/your_book.epub \
+  --output_dir /audiobook_data/individual_chapters \
+  --model /opt/piper/voices/en/en_US-lessac-medium.onnx \
+  --per_chapter
+```
+
+This will create individual MP3 files for each chapter in the specified `--output_dir` directory. The files will be named according to the chapter number and title, for example:
+- `Chapter_01_Introduction.mp3`
+- `Chapter_02_Getting_Started.mp3`
+- ...and so on.
+
+You can access these individual chapter files directly from your host machine at `~/audiobook_data/individual_chapters/`.
 
 ## 3. Understanding Container and Host File Locations
 
