@@ -14,11 +14,14 @@ The plan supports both ePub and PDF formats, with ePub being the recommended for
 - At least 20GB of free storage space
 - Internet connection for downloading models
 
-### 1.2 Clone the jetson-containers Repository
+### 1.2 Clone the Repository and Install Dependencies
 ```bash
-# Clone the repository
-git clone https://github.com/dusty-nv/jetson-containers
-cd jetson-containers
+# Clone this repository
+git clone https://github.com/kieranlal/audiobook.git
+cd audiobook
+
+# Install required dependencies
+pip install -r requirements.txt
 ```
 
 ### 1.3 Prepare Data Directory
@@ -32,6 +35,29 @@ cp ~/your_book.epub ~/audiobook/
 # or
 cp ~/your_book.pdf ~/audiobook/
 ```
+
+Note: The repository includes a sample EPUB file (`learning_ai.epub`) that you can use for testing.
+
+### 1.4 Using the Quick Start Script
+
+For convenience, you can use the included `quickstart.sh` script to automatically set up the environment and generate an audiobook:
+
+```bash
+# Make the script executable
+chmod +x quickstart.sh
+
+# Run the script with your book file (default uses Piper TTS)
+./quickstart.sh --input your_book.epub --voice lessac
+
+# For Sesame TTS
+./quickstart.sh --input your_book.epub --engine sesame
+```
+
+The quickstart script handles:
+- Installing dependencies
+- Setting up the right environment
+- Running the appropriate audiobook generation script
+- Applying chapter markers to the final audio file
 
 ## 2. Approach 1: Generating Audiobook with Piper (via jetson-containers)
 
@@ -69,16 +95,29 @@ ffmpeg -i /audiobook_data/test.wav -y -codec:a libmp3lame -qscale:a 2 /audiobook
 pip install PyPDF2 nltk tqdm pydub ebooklib beautifulsoup4
 ```
 
-### 2.5 Setup the Audiobook Generation Script
+### 2.5 Using the Audiobook Generation Scripts
 
-Instead of including the full script here, you should create the Python script as a separate file in your repository: 
-`/Users/kieranlal/workspace/audiobook/generate_audiobook_piper.py`
+The repository contains several Python scripts:
 
-This script handles:
-- Reading ePub or PDF files
-- Extracting chapters and text
-- Converting text to speech using Piper TTS
-- Combining audio files into a complete audiobook
+1. `generate_audiobook_piper.py` - Main script for generating audiobooks using Piper TTS (works with both EPUB and PDF)
+2. `generate_audiobook_piper_epub.py` - Specialized script for EPUB files using Piper TTS (optimized for EPUB with simpler parameters)
+3. `generate_audiobook_sesame.py` - Main script for generating audiobooks using Sesame CSM (works with both EPUB and PDF)
+4. `generate_audiobook_sesame_epub.py` - Specialized script for EPUB files using Sesame CSM (optimized for EPUB with simpler parameters)
+5. `extract_chapters.py` - Utility for extracting chapter information from books
+
+**Difference between general and EPUB-specific scripts:**
+- General scripts (`generate_audiobook_piper.py`, `generate_audiobook_sesame.py`) support both EPUB and PDF files with more configuration options
+- EPUB-specific scripts (`generate_audiobook_piper_epub.py`, `generate_audiobook_sesame_epub.py`) are optimized for EPUB files with simplified parameters
+
+#### 2.5.1 Extracting Chapter Information
+
+Before generating the audiobook, you can extract chapter information from your book to create chapter markers in the final audio file:
+
+```bash
+python extract_chapters.py --file /books/your_book.epub --output /audiobook_data/chapters.txt --duration 7200
+```
+
+The `--duration` parameter should be set to the expected length of your audiobook in seconds.
 
 ### 2.6 Run the Audiobook Generation Script
 ```bash
@@ -93,6 +132,12 @@ python generate_audiobook_piper.py \
   --output_dir /audiobook_data/audiobook_chapters_piper \
   --model /opt/piper/voices/en/en_US-lessac-medium.onnx \
   --temp_dir /audiobook_data/temp_audio_piper
+
+# For EPUB files specifically (using dedicated script)
+python generate_audiobook_piper_epub.py \
+  --input /books/your_book.epub \
+  --output /audiobook_data/audiobook_piper.mp3 \
+  --model /opt/piper/voices/en/en_US-lessac-medium.onnx
 
 # For large books, process specific chapter ranges
 python generate_audiobook_piper.py \
@@ -157,12 +202,19 @@ python -c "from huggingface_hub import snapshot_download; snapshot_download(repo
 cd ..
 ```
 
-### 4.3 Setup the Audiobook Generation Script for Sesame
+### 4.3 Using the Sesame Audiobook Script
 
-Similar to the Piper approach, you should create a separate Python script:
-`/Users/kieranlal/workspace/audiobook/generate_audiobook_sesame.py`
+```bash
+# For general use
+python generate_audiobook_sesame.py \
+  --input /books/your_book.epub \
+  --output /audiobook_data/audiobook_sesame.mp3
 
-This script will use the Sesame CSM model instead of Piper for higher quality voice synthesis.
+# For EPUB files specifically
+python generate_audiobook_sesame_epub.py \
+  --input /books/your_book.epub \
+  --output /audiobook_data/audiobook_sesame.mp3
+```
 
 ## 5. Voice Model Selection Guide
 
@@ -189,3 +241,13 @@ For extra safety, you can backup your generated chapters before making changes:
 ```bash
 rsync -a ~/audiobook_data/audiobook_chapters_piper/ ~/audiobook_data/audiobook_chapters_piper_bak/
 ```
+
+## 7. Troubleshooting
+
+If you encounter issues with the audiobook generation:
+
+1. **Memory Issues**: If the Jetson runs out of memory, try processing the book in smaller chunks using the `--chapter_range` option
+2. **Container Errors**: Make sure the volume mounts are specified correctly and come BEFORE the container name
+3. **Model Loading**: Verify that the voice model path is correct
+4. **Missing Dependencies**: Run `pip install -r requirements.txt` to install all needed packages
+5. **CUDA Problems**: Ensure your Jetson has the latest JetPack/L4T version installed
