@@ -46,11 +46,15 @@ For convenience, you can use the included `quickstart.sh` script to automaticall
 # Make the script executable
 chmod +x quickstart.sh
 
-# Run the script with your book file (default uses Piper TTS)
-./quickstart.sh -i learning_ai.epub -v lessac
+# Run the script with your book file (default uses Piper TTS engine)
+./quickstart.sh learning_ai.epub piper lessac
 
-# For Sesame TTS
-./quickstart.sh -i learning_ai.epub -e sesame
+# General syntax:
+# ./quickstart.sh [book_filename] [engine] [voice]
+# Where:
+#  - book_filename: Your EPUB or PDF file
+#  - engine: piper or sesame
+#  - voice: voice model name (e.g., lessac, ryan, etc. for piper)
 ```
 
 The quickstart script handles:
