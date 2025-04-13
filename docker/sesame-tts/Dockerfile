@@ -50,17 +50,24 @@ RUN pip3 install --no-cache-dir einops || echo "Warning: Failed to install einop
     pip3 install --no-cache-dir vector_quantize_pytorch || echo "Warning: Failed to install vector_quantize_pytorch" && \
     pip3 install --no-cache-dir datasets || echo "Warning: Failed to install datasets"
 
-# Download essential CSM files instead of cloning the full repository
-WORKDIR /opt/csm
-RUN wget -q https://raw.githubusercontent.com/SesameAILabs/csm/main/generator.py && \
-    wget -q https://raw.githubusercontent.com/SesameAILabs/csm/main/models.py && \
-    touch __init__.py && \
-    echo 'from .generator import load_csm_1b, Segment' > __init__.py
-
 # Install silentcipher (trying PyPI first, then GitHub)
 RUN pip3 install --no-cache-dir silentcipher || \
     pip3 install --no-cache-dir git+https://github.com/SesameAILabs/silentcipher.git@master || \
     echo "Warning: Failed to install silentcipher. Some watermarking features might not work."
+
+# Download essential CSM files instead of cloning the full repository
+WORKDIR /opt/csm
+RUN wget -q https://raw.githubusercontent.com/SesameAILabs/csm/main/generator.py && \
+    wget -q https://raw.githubusercontent.com/SesameAILabs/csm/main/models.py 
+
+# Create simple Python module to make imports work
+RUN echo '# CSM package\n\
+from .generator import load_csm_1b, Segment, Generator\n\
+__all__ = ["load_csm_1b", "Segment", "Generator"]\n\
+' > /opt/csm/__init__.py
+
+# Add CSM to Python path directly instead of installing it
+RUN echo 'import sys; sys.path.append("/opt/csm")' > /usr/local/lib/python3.8/dist-packages/csm_path.pth
 
 # Download NLTK data
 RUN python3 -c "import nltk; nltk.download('punkt')"
@@ -79,13 +86,18 @@ from pathlib import Path\n\
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")\n\
 logger = logging.getLogger("test_csm")\n\
 \n\
-# Add CSM to path\n\
-sys.path.insert(0, "/opt/csm")\n\
-\n\
 try:\n\
     import torch\n\
     import torchaudio\n\
-    from generator import load_csm_1b, Segment\n\
+    # Try multiple import paths for flexibility\n\
+    try:\n\
+        from csm import load_csm_1b, Segment\n\
+        logger.info("Successfully imported from csm package")\n\
+    except ImportError:\n\
+        # Direct import from module path\n\
+        sys.path.insert(0, "/opt/csm")\n\
+        from generator import load_csm_1b, Segment\n\
+        logger.info("Successfully imported directly from generator.py")\n\
     \n\
     logger.info("CSM imports successful")\n\
     \n\
