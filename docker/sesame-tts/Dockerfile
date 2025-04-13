@@ -55,7 +55,8 @@ RUN git clone https://github.com/SesameAILabs/csm.git && \
     sed -i '/^torchtune==/d' requirements.txt setup.py && \
     # Remove the silentcipher dependency line entirely from setup.py
     sed -i '/silentcipher @ git/d' setup.py && \
-    pip install -e .
+    # Install csm itself, ignoring its listed dependencies
+    pip install --no-deps -e .
 
 # Download the model
 RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
