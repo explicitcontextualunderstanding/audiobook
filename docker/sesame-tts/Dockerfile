@@ -40,8 +40,13 @@ RUN pip install .
 
 # --- Install CSM dependencies and CSM itself ---
 WORKDIR /opt
-# Install mimi first
-RUN pip install git+https://github.com/SesameAILabs/mimi.git
+# Clone and install mimi locally
+RUN git clone https://github.com/SesameAILabs/mimi.git && \
+    cd mimi && \
+    pip install . && \
+    cd .. && \
+    rm -rf mimi # Clean up cloned repo after install
+
 # Install other specific CSM dependencies (ignore versions for broader compatibility initially)
 RUN pip install einops rotary_embedding_torch vector_quantize_pytorch xformers accelerate
 
