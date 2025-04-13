@@ -45,7 +45,7 @@ RUN sed -i "s/scipy>=[0-9.]*/scipy/" setup.py requirements.txt || true
 RUN pip install .
 # --- End of silentcipher pre-installation ---
 
-# Clone and install Sesame CSM
+# Clone and prepare Sesame CSM source
 WORKDIR /opt
 RUN git clone https://github.com/SesameAILabs/csm.git && \
     cd csm && \
@@ -54,9 +54,18 @@ RUN git clone https://github.com/SesameAILabs/csm.git && \
     sed -i '/^moshi==/d' requirements.txt setup.py && \
     sed -i '/^torchtune==/d' requirements.txt setup.py && \
     # Remove the silentcipher dependency line entirely from setup.py
-    sed -i '/silentcipher @ git/d' setup.py && \
-    # Install csm itself, ignoring its listed dependencies
-    pip install --no-deps -e .
+    sed -i '/silentcipher @ git/d' setup.py
+
+# Copy CSM source directly into site-packages
+# Determine site-packages path (adjust if base image Python version changes)
+# For python3.8 in the base image:
+ENV SITE_PACKAGES=/usr/local/lib/python3.8/dist-packages
+RUN mkdir -p ${SITE_PACKAGES} && \
+    # Copy the actual 'csm' package directory from the cloned repo
+    cp -r /opt/csm/csm ${SITE_PACKAGES}/csm
+
+# Download the model - REMOVED FROM DOCKERFILE
+# RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
 
 # Create directories for mounting volumes
 RUN mkdir -p /audiobook_data /books /models

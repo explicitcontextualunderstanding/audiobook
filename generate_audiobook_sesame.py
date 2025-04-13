@@ -13,16 +13,14 @@ from pydub import AudioSegment
 import torch
 import torchaudio
 
-# Add /opt/csm to the Python path
-sys.path.insert(0, '/opt/csm')
-
 # Now try importing CSM
 try:
     from csm.model.model import CSM
     from csm.utils.spec_utils import wav_to_fbank
     from csm.utils.tokenizer import Tokenizer
 except ImportError as e:
-    print("Failed to import CSM module even after adding /opt/csm to path.")
+    # Keep error reporting for debugging if needed
+    print("Failed to import CSM module.")
     print("PYTHONPATH:", os.environ.get('PYTHONPATH'))
     print("sys.path:", sys.path)
     raise e

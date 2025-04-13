@@ -337,18 +337,17 @@ if ! docker image inspect sesame-tts &>/dev/null; then
     echo "Building Sesame TTS Docker container..."
     # Build using the modified Dockerfile (docker/sesame-tts/Dockerfile)
     # NOTE: The Dockerfile has been significantly modified to handle dependency conflicts:
-    #   - Installs Rust/Cargo (required by 'tokenizers').
+    #   - Installs Rust/Cargo.
     #   - Installs base Python dependencies.
-    #   - Clones 'silentcipher', modifies its numpy/scipy requirements, and installs it.
-    #   - Clones 'csm', removes pinned versions (transformers, moshi, torchtune), removes
-    #     the silentcipher dependency line, and installs csm using '--no-deps'.
+    #   - Clones 'silentcipher', modifies requirements, and installs it.
+    #   - Clones 'csm', removes pinned versions and silentcipher dependency.
+    #   - **Copies the 'csm' source code directly into site-packages instead of using pip install -e.**
     #   - The model download step has been REMOVED from the Dockerfile.
-    # These changes allow the build to complete but rely on the manually installed dependencies.
     sudo docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
 fi
 
 # Run the container with direct script execution, mounting the downloaded model
-# NOTE: Removed -e PYTHONPATH=/opt/csm as the script now modifies sys.path
+# NOTE: No -e PYTHONPATH needed. Script no longer modifies sys.path.
 docker run --runtime nvidia --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
@@ -361,7 +360,7 @@ docker run --runtime nvidia --rm \
   --voice_preset "calm"
 
 # Alternatively, run the container in interactive mode, mounting the model
-# NOTE: Removed -e PYTHONPATH=/opt/csm here too
+# NOTE: No -e PYTHONPATH needed.
 docker run --runtime nvidia -it --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
@@ -370,7 +369,7 @@ docker run --runtime nvidia -it --rm \
   sesame-tts
 ```
 
-When using the interactive mode, you can then run commands inside the container, specifying the model path (the script will handle the path):
+When using the interactive mode, you can then run commands inside the container, specifying the model path:
 
 ```bash
 # Generate an audiobook using Sesame (inside container)
