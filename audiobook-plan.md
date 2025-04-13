@@ -331,15 +331,19 @@ Now you can proceed with building and running the container.
 if ! docker image inspect sesame-tts &>/dev/null; then
     echo "Building Sesame TTS Docker container..."
     # Build using the modified Dockerfile (docker/sesame-tts/Dockerfile)
-    # NOTE: The Dockerfile now installs dependencies (silentcipher, mimi, others)
-    # and then installs 'csm' itself in editable mode using 'pip install -e .'
-    # This relies on the dependencies being correctly installed first.
+    # NOTE: The Dockerfile now uses a more robust strategy:
+    #   - Installs dependencies with pinned versions and fallbacks.
+    #   - Downloads specific CSM source files (generator.py, models.py, setup.py) using wget.
+    #   - Installs silentcipher from PyPI with a git fallback.
+    #   - Creates a minimal CSM package structure and installs it.
+    #   - Includes a test script and a helpful entrypoint.
     sudo docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
 fi
 
 # Run the container with direct script execution
 # The script now uses generator.load_csm_1b() and generate()
 # The --voice_preset argument provides context audio
+# Note: The entrypoint script will run first, displaying usage info.
 docker run --runtime nvidia --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
@@ -353,6 +357,7 @@ docker run --runtime nvidia --rm \
   --voice_preset calm # Optional: Name of wav file in model_path/prompts
 
 # Alternatively, run the container in interactive mode
+# The entrypoint script will display usage info, then drop you into a bash shell.
 docker run --runtime nvidia -it --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
@@ -363,9 +368,13 @@ docker run --runtime nvidia -it --rm \
 ```
 *Note: We now mount the host's Hugging Face cache (`~/.cache/huggingface`) to `/root/.cache/huggingface` inside the container. This allows the container to use the host's login token and potentially cached Llama model files.*
 
-When using the interactive mode, run the script inside:
+When using the interactive mode, you can first test the installation and then run the generation script:
 
 ```bash
+# Test CSM installation (inside container)
+# This script verifies model loading and performs a basic generation.
+python /usr/local/bin/test_csm.py /models/sesame-csm-1b
+
 # Generate an audiobook using Sesame (inside container)
 python3 /books/generate_audiobook_sesame.py \
   --input /books/your_book.epub \
