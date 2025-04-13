@@ -313,12 +313,12 @@ The `sesame/csm-1b` model requires authentication. You need to download it manua
     huggingface-cli login
     # Follow the prompts, you might need to create a token on huggingface.co
     ```
-3.  **Download the model:** This will download the model files to a local cache directory (usually `~/.cache/huggingface/hub/models--sesame--csm-1b`).
+3.  **Download the model:** This will download the model files to a specific local directory.
     ```bash
-    huggingface-cli download sesame/csm-1b --local-dir ~/huggingface_models/sesame-csm-1b --local-dir-use-symlinks False
-    # We use a specific local dir and disable symlinks for easier mounting into Docker.
-    # Make sure the directory ~/huggingface_models exists or adjust the path.
+    # Make sure the target directory exists
     mkdir -p ~/huggingface_models
+    # Download, specifying the local directory and disabling symlinks for Docker compatibility
+    huggingface-cli download sesame/csm-1b --local-dir ~/huggingface_models/sesame-csm-1b --local-dir-use-symlinks False
     ```
     *Note: You may need to visit the model page on Hugging Face first (https://huggingface.co/sesame/csm-1b) and accept any terms or agreements.*
 
@@ -335,7 +335,15 @@ Now you can proceed with building and running the container.
 # Check if sesame-tts image exists, build if not
 if ! docker image inspect sesame-tts &>/dev/null; then
     echo "Building Sesame TTS Docker container..."
-    # Build using the modified Dockerfile (model download step removed)
+    # Build using the modified Dockerfile (docker/sesame-tts/Dockerfile)
+    # NOTE: The Dockerfile has been significantly modified to handle dependency conflicts:
+    #   - Installs Rust/Cargo (required by 'tokenizers').
+    #   - Installs base Python dependencies.
+    #   - Clones 'silentcipher', modifies its numpy/scipy requirements, and installs it.
+    #   - Clones 'csm', removes pinned versions (transformers, moshi, torchtune), removes
+    #     the silentcipher dependency line, and installs csm using '--no-deps'.
+    #   - The model download step has been REMOVED from the Dockerfile.
+    # These changes allow the build to complete but rely on the manually installed dependencies.
     sudo docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
 fi
 
