@@ -27,18 +27,17 @@ ENV NO_TORCH_COMPILE=1
 # Create directory for CSM code
 RUN mkdir -p /opt/csm
 
-# Install Python dependencies with exact versions from CSM's requirements.txt
-# Avoid git clone by installing packages through pip
+# Install Python dependencies - using more flexible versioning
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pip3 install --no-cache-dir \
-    torch==2.4.0 \
-    torchaudio==2.4.0 \
-    tokenizers==0.21.0 \
-    transformers==4.49.0 \
-    huggingface_hub==0.28.1 \
-    moshi==0.2.2 \
-    torchtune==0.4.0 \
-    torchao==0.9.0
+    "torch>=2.0.0,<2.5.0" \
+    "torchaudio>=2.0.0,<2.5.0" \
+    "tokenizers>=0.13.0,<0.22.0" \
+    "transformers>=4.30.0,<4.47.0" \
+    "huggingface_hub>=0.16.0,<0.29.0" \
+    "moshi>=0.2.0,<0.3.0" \
+    "torchtune>=0.4.0,<0.5.0" \
+    "torchao>=0.9.0,<1.0.0"
 
 # Handle silentcipher - try PyPI first, fall back to minimal git clone if needed
 RUN pip3 install --no-cache-dir silentcipher || \
