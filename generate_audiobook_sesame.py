@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import sys # Import sys module
 import re
 import shutil
 import time
@@ -11,9 +12,20 @@ from tqdm import tqdm
 from pydub import AudioSegment
 import torch
 import torchaudio
-from csm.model.model import CSM
-from csm.utils.spec_utils import wav_to_fbank
-from csm.utils.tokenizer import Tokenizer
+
+# Add /opt/csm to the Python path
+sys.path.insert(0, '/opt/csm')
+
+# Now try importing CSM
+try:
+    from csm.model.model import CSM
+    from csm.utils.spec_utils import wav_to_fbank
+    from csm.utils.tokenizer import Tokenizer
+except ImportError as e:
+    print("Failed to import CSM module even after adding /opt/csm to path.")
+    print("PYTHONPATH:", os.environ.get('PYTHONPATH'))
+    print("sys.path:", sys.path)
+    raise e
 
 # --- Helper Functions (assuming extract_text_from_epub, extract_text_from_pdf, split_text exist) ---
 

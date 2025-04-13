@@ -348,6 +348,7 @@ if ! docker image inspect sesame-tts &>/dev/null; then
 fi
 
 # Run the container with direct script execution, mounting the downloaded model
+# NOTE: Removed -e PYTHONPATH=/opt/csm as the script now modifies sys.path
 docker run --runtime nvidia --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
@@ -360,6 +361,7 @@ docker run --runtime nvidia --rm \
   --voice_preset "calm"
 
 # Alternatively, run the container in interactive mode, mounting the model
+# NOTE: Removed -e PYTHONPATH=/opt/csm here too
 docker run --runtime nvidia -it --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
@@ -368,7 +370,7 @@ docker run --runtime nvidia -it --rm \
   sesame-tts
 ```
 
-When using the interactive mode, you can then run commands inside the container, specifying the model path:
+When using the interactive mode, you can then run commands inside the container, specifying the model path (the script will handle the path):
 
 ```bash
 # Generate an audiobook using Sesame (inside container)
