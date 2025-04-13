@@ -75,14 +75,7 @@ RUN git clone https://github.com/SesameAILabs/csm.git && \
     echo "--- Verification complete ---"
 
 # Download the model - REMOVED FROM DOCKERFILE
-# RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"    # Verify that the copy happened and list contents
-packages ---" && \
-# Create directories for mounting volumeskages/csm && \
-RUN mkdir -p /audiobook_data /books /models    echo "--- Verification complete ---"
-
-# Set working directoryREMOVED FROM DOCKERFILE
-
-WORKDIR /audiobook_data# RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
+# RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
 
 # Create directories for mounting volumes
 RUN mkdir -p /audiobook_data /books /models
