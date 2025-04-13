@@ -40,6 +40,7 @@ RUN git clone https://github.com/SesameAILabs/csm.git && \
     # Remove specific version requirements causing conflicts
     sed -i '/^transformers==/d' requirements.txt && \
     sed -i '/^moshi==/d' requirements.txt && \
+    sed -i '/^torchtune==/d' requirements.txt && \
     pip install -e .
 
 # Download the model
