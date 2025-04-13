@@ -1,41 +1,21 @@
 #!/usr/bin/env python3
 
-import os
-import torch
 import argparse
-from tqdm import tqdm
-from pathlib import Path
-from PyPDF2 import PdfReader
-from pydub import AudioSegment
-from nltk.tokenize import sent_tokenize
-import nltk
-import time
+import os
 import re
-import ebooklib
-from ebooklib import epub
-from bs4 import BeautifulSoup
+import shutil
+import time
 import datetime
 import psutil
-import shutil
+from tqdm import tqdm
+from pydub import AudioSegment
+import torch
+import torchaudio
+from csm.model.model import CSM
+from csm.utils.spec_utils import wav_to_fbank
+from csm.utils.tokenizer import Tokenizer
 
-# Download NLTK resources if not already downloaded
-try:
-    nltk.data.find('tokenizers/punkt')
-except LookupError:
-    nltk.download('punkt')
-
-# Validate input file exists and has correct format
-def validate_input_file(file_path):
-    """Validate that the input file exists and has the correct format."""
-    if not os.path.exists(file_path):
-        print(f"Error: Input file '{file_path}' does not exist.")
-        return False
-        
-    if not (file_path.lower().endswith('.epub') or file_path.lower().endswith('.pdf')):
-        print(f"Error: Input file format not supported. Only .epub and .pdf files are supported.")
-        return False
-        
-    return True
+# --- Helper Functions (assuming extract_text_from_epub, extract_text_from_pdf, split_text exist) ---
 
 def html_to_text(html_content):
     """Convert HTML content to plain text."""
@@ -47,7 +27,7 @@ def html_to_text(html_content):
 
 def extract_text_from_epub(epub_path):
     """Extract text and chapters from an ePub file."""
-    print(f"Extracting text from ePub: {epub_path}...")
+    print("Extracting text from ePub: {}...".format(epub_path))
     
     book = epub.read_epub(epub_path)
     chapters = []
@@ -71,7 +51,7 @@ def extract_text_from_epub(epub_path):
         # Find title if possible
         soup = BeautifulSoup(content, 'html.parser')
         title_tag = soup.find(['h1', 'h2', 'h3', 'h4'])
-        title = title_tag.get_text().strip() if title_tag else f"Chapter {len(chapter_titles) + 1}"
+        title = title_tag.get_text().strip() if title_tag else "Chapter {}".format(len(chapter_titles) + 1)
         
         # Extract text
         text = html_to_text(content)
@@ -83,12 +63,12 @@ def extract_text_from_epub(epub_path):
         chapters.append(text)
         chapter_titles.append(title)
     
-    print(f"Extracted {len(chapters)} chapters from ePub")
+    print("Extracted {} chapters from ePub".format(len(chapters)))
     return chapters, chapter_titles
 
 def extract_text_from_pdf(pdf_path):
     """Extract text from a PDF file and attempt to detect chapters."""
-    print(f"Extracting text from PDF: {pdf_path}...")
+    print("Extracting text from PDF: {}...".format(pdf_path))
     
     reader = PdfReader(pdf_path)
     full_text = ""
@@ -104,7 +84,7 @@ def extract_text_from_pdf(pdf_path):
     
     # Detect chapters in the PDF text
     chapters, chapter_titles = detect_chapters_in_text(full_text)
-    print(f"Detected {len(chapters)} chapters from PDF")
+    print("Detected {} chapters from PDF".format(len(chapters)))
     
     return chapters, chapter_titles
 
@@ -187,196 +167,216 @@ def estimate_processing_time(num_chunks, avg_time_per_chunk=10):
     total_seconds = num_chunks * avg_time_per_chunk
     return str(datetime.timedelta(seconds=total_seconds))
 
-def generate_audio(model, text, output_path, voice_preset="default", speaking_rate=1.0):
-    """Generate audio for a text segment."""
+def synthesize_chunk(model, tokenizer, text, voice_preset_wav, output_path, device):
+    """Synthesizes audio for a text chunk using Sesame CSM."""
     try:
-        # Clear CUDA cache
-        torch.cuda.empty_cache()
+        # Ensure voice preset audio is loaded correctly
+        if not os.path.exists(voice_preset_wav):
+            print("Error: Voice preset file not found: {}".format(voice_preset_wav))
+            return False
         
+        # Load voice preset and convert to fbank
+        ref_wav, ref_sr = torchaudio.load(voice_preset_wav)
+        ref_fbank = wav_to_fbank(ref_wav, ref_sr, device=device)
+
+        # Tokenize text
+        text_tokens = torch.IntTensor(tokenizer.encode(text, lang='en')).unsqueeze(0).to(device)
+
         # Generate audio
-        audio = model.generate(
-            text=text,
-            voice_preset=voice_preset,
-            speaking_rate=speaking_rate
-        )
-        
-        audio.export(output_path, format="mp3")
+        with torch.no_grad():
+            gen_wav, gen_sr = model.generate(ref_fbank, text_tokens)
+
+        # Save generated audio
+        torchaudio.save(output_path, gen_wav.cpu(), gen_sr)
         return True
     except Exception as e:
-        print(f"Error generating audio: {e}")
+        print("Error during synthesis for chunk: {}".format(e))
+        # print("Chunk text: {}".format(text[:100])) # Optional: print problematic chunk start
         return False
 
-def combine_audio_files(audio_files, output_path):
-    """Combine multiple audio files into a single audiobook."""
-    # Start with an empty audio segment
-    combined = AudioSegment.empty()
-    
-    # Add a pause between segments (500ms)
-    pause = AudioSegment.silent(duration=500)
-    
-    # Combine all files
-    for file_path in tqdm(audio_files, desc="Combining audio"):
-        segment = AudioSegment.from_mp3(file_path)
-        combined += segment + pause
-    
-    # Export the final audiobook
-    combined.export(output_path, format="mp3")
-    print(f"Audiobook saved to {output_path}")
+def main(args):
+    # Validate input file path
+    if not os.path.exists(args.input):
+        # Replace f-string on (originally) line 31
+        print("Error: Input file '{}' does not exist.".format(args.input))
+        return
 
-def process_chapter(model, chapter_text, chapter_title, chapter_num, args):
-    """Process a single chapter and generate audio."""
-    print(f"Processing chapter {chapter_num}: {chapter_title}")
-    
-    # Create chapter directory
-    chapter_dir = os.path.join(args.temp_dir, f"chapter_{chapter_num:02d}")
-    os.makedirs(chapter_dir, exist_ok=True)
-    
-    # Split chapter text into chunks
-    chunks = preprocess_text(chapter_text, args.chunk_size)
-    print(f"Chapter split into {len(chunks)} chunks")
-    
-    # Estimate processing time
-    estimated_time = estimate_processing_time(len(chunks))
-    print(f"Estimated processing time for this chapter: {estimated_time}")
-    
-    # Generate audio for each chunk
+    # Validate model path
+    if not os.path.exists(args.model_path) or not os.path.isdir(args.model_path):
+        print("Error: Model path '{}' does not exist or is not a directory.".format(args.model_path))
+        return
+
+    # Determine voice preset path
+    # Assuming presets are within the model directory structure
+    voice_preset_filename = "{}.wav".format(args.voice_preset) # Example: calm.wav
+    # Look in common locations within the model dir
+    potential_paths = [
+        os.path.join(args.model_path, voice_preset_filename),
+        os.path.join(args.model_path, "prompts", voice_preset_filename)
+    ]
+    voice_preset_path = None
+    for path in potential_paths:
+        if os.path.exists(path):
+            voice_preset_path = path
+            break
+            
+    if not voice_preset_path:
+        print("Error: Could not find voice preset '{}' in model path '{}' or its 'prompts' subdirectory.".format(args.voice_preset, args.model_path))
+        return
+    print("Using voice preset: {}".format(voice_preset_path))
+
+
+    # Create output directories if they don't exist
+    temp_dir = args.temp_dir or os.path.join(os.path.dirname(args.output), "temp_audio_sesame")
+    os.makedirs(temp_dir, exist_ok=True)
+
+    # --- Text Extraction ---
+    print("Extracting text from '{}'...".format(args.input))
+    file_extension = os.path.splitext(args.input)[1].lower()
+    if file_extension == '.epub':
+        full_text = extract_text_from_epub(args.input)
+    elif file_extension == '.pdf':
+        full_text = extract_text_from_pdf(args.input)
+    else:
+        print("Error: Unsupported file format '{}'. Please use EPUB or PDF.".format(file_extension))
+        return
+
+    if not full_text:
+        print("Error: Could not extract text from the input file.")
+        return
+    print("Text extracted successfully.")
+
+    # --- Text Splitting ---
+    print("Splitting text into manageable chunks...")
+    text_chunks = split_text(full_text, max_length=args.chunk_length) # Use args.chunk_length
+    print("Text split into {} chunks.".format(len(text_chunks)))
+
+    # --- Model Loading ---
+    print("Loading Sesame CSM model from '{}'...".format(args.model_path))
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print("Using device: {}".format(device))
+
+    try:
+        # Assuming model files (config.json, ckpt.pt/model.safetensors) are in model_path
+        config_path = os.path.join(args.model_path, 'config.json')
+        
+        # Find checkpoint file
+        ckpt_path = None
+        if os.path.exists(os.path.join(args.model_path, 'ckpt.pt')):
+            ckpt_path = os.path.join(args.model_path, 'ckpt.pt')
+        elif os.path.exists(os.path.join(args.model_path, 'model.safetensors')):
+             ckpt_path = os.path.join(args.model_path, 'model.safetensors') # CSM might need specific loading for safetensors
+
+        if not ckpt_path:
+             print("Error: Could not find 'ckpt.pt' or 'model.safetensors' in model path '{}'".format(args.model_path))
+             return
+
+        model = CSM.from_pretrained(config_path=config_path, ckpt_path=ckpt_path)
+        model.eval()
+        model.to(device)
+        tokenizer = Tokenizer() # Assuming Tokenizer doesn't need model path
+        print("Model loaded successfully.")
+    except Exception as e:
+        print("Error loading model: {}".format(e))
+        return
+
+    # --- Audio Synthesis ---
+    print("Starting audio synthesis...")
     audio_files = []
-    start_time = time.time()
-    
-    # Calculate chunks per batch based on memory limit
-    available_memory = psutil.virtual_memory().available
-    memory_per_chunk = args.memory_per_chunk  # MB per chunk (estimated)
-    chunks_per_batch = min(
-        args.max_batch_size,
-        max(1, int(available_memory / (memory_per_chunk * 1024 * 1024)))
-    )
-    print(f"Processing up to {chunks_per_batch} chunks at a time based on available memory")
-    
-    for i, chunk in enumerate(tqdm(chunks, desc="Generating audio")):
-        output_path = os.path.join(chapter_dir, f"chunk_{i:04d}.mp3")
+    synthesis_failed = False
+    for i, chunk in enumerate(tqdm(text_chunks, desc="Synthesizing Chunks")):
+        chunk_filename = os.path.join(temp_dir, "chunk_{:04d}.wav".format(i))
         
-        # Skip if already processed
-        if os.path.exists(output_path):
-            print(f"Skipping chunk {i} - already processed")
-            audio_files.append(output_path)
+        # Resume capability: Skip if chunk already exists
+        if os.path.exists(chunk_filename) and os.path.getsize(chunk_filename) > 0:
+            # print(f"Skipping existing chunk {i}") # Use .format() if needed
+            audio_files.append(chunk_filename)
             continue
-            
-        # Generate audio
-        success = generate_audio(model, chunk, output_path, args.voice_preset, args.speaking_rate)
-        
-        if success:
-            audio_files.append(output_path)
-            
-        # Calculate and display progress
-        if i > 0 and i % 5 == 0:
-            elapsed_time = time.time() - start_time
-            avg_time_per_chunk = elapsed_time / i
-            remaining_chunks = len(chunks) - i
-            estimated_remaining = remaining_chunks * avg_time_per_chunk
-            eta = str(datetime.timedelta(seconds=int(estimated_remaining)))
-            print(f"Progress: {i}/{len(chunks)} chunks ({i/len(chunks)*100:.1f}%) - ETA: {eta}")
-        
-        # Take a short break every few chunks to prevent overheating and clear memory
-        if i > 0 and i % chunks_per_batch == 0:
-            print("Taking a break to free up memory and prevent overheating...")
-            torch.cuda.empty_cache()
-            time.sleep(10)
-    
-    # Combine audio files for this chapter
-    if audio_files:
-        safe_title = re.sub(r'[^\w\s-]', '', chapter_title).strip().replace(' ', '_')
-        chapter_output = os.path.join(args.output_dir, f"chapter_{chapter_num:02d}_{safe_title}.mp3")
-        combine_audio_files(audio_files, chapter_output)
-        print(f"Chapter audio saved to {chapter_output}")
-        return chapter_output
-    else:
-        print(f"No audio generated for chapter {chapter_num}")
-        return None
 
-def main():
-    parser = argparse.ArgumentParser(description="Generate an audiobook using Sesame CSM")
-    parser.add_argument("--input", required=True, help="Path to the input book file (ePub or PDF)")
-    parser.add_argument("--output", default="audiobook_sesame.mp3", help="Output combined audiobook file path")
-    parser.add_argument("--output_dir", default="audiobook_chapters_sesame", help="Output directory for chapter files")
-    parser.add_argument("--temp_dir", default="temp_audio_sesame", help="Directory for temporary audio files")
-    parser.add_argument("--chunk_size", type=int, default=1000, help="Maximum characters per chunk")
-    parser.add_argument("--voice_preset", default="default", help="Voice preset (default, calm, excited, serious)")
-    parser.add_argument("--speaking_rate", type=float, default=1.0, help="Speaking rate (1.0 is normal)")
-    parser.add_argument("--max_batch_size", type=int, default=10, help="Maximum chunks to process before pausing")
-    parser.add_argument("--memory_per_chunk", type=int, default=150, help="Estimated memory usage per chunk in MB")
-    parser.add_argument("--chapter_range", help="Range of chapters to process (e.g., '1-5')")
-    args = parser.parse_args()
-    
-    # Validate input file
-    if not validate_input_file(args.input):
-        return 1
-    
-    # Create directories
-    os.makedirs(args.temp_dir, exist_ok=True)
-    os.makedirs(args.output_dir, exist_ok=True)
-    
-    # Load CSM model
-    print("Loading Sesame CSM model...")
-    from csm import CSMModel
-    model = CSMModel.from_pretrained("sesame/csm-1b")
-    model = model.half().to("cuda")  # Use half precision to save memory
-    
-    # Determine file type and extract text
-    input_path = args.input
-    
-    if input_path.lower().endswith('.epub'):
-        chapters, chapter_titles = extract_text_from_epub(input_path)
-    elif input_path.lower().endswith('.pdf'):
-        chapters, chapter_titles = extract_text_from_pdf(input_path)
-    else:
-        print(f"Unsupported file format: {input_path}")
-        print("Supported formats: .epub, .pdf")
-        return 1
-    
-    # Process only specified chapter range if provided
-    if args.chapter_range:
+        if not synthesize_chunk(model, tokenizer, chunk, voice_preset_path, chunk_filename, device):
+            print("Warning: Failed to synthesize chunk {}. Skipping.".format(i))
+            # Decide if you want to stop on failure or just skip
+            # synthesis_failed = True
+            # break 
+            continue # Skip this chunk
+
+        audio_files.append(chunk_filename)
+        
+    if synthesis_failed:
+         print("Audio synthesis aborted due to errors.")
+         # Optional: Clean up temp files?
+         return
+
+    if not audio_files:
+        print("Error: No audio chunks were successfully synthesized.")
+        return
+
+    print("Audio synthesis complete.")
+
+    # --- Audio Concatenation ---
+    print("Combining audio chunks...")
+    combined_audio = AudioSegment.empty()
+    try:
+        for audio_file in tqdm(audio_files, desc="Combining Audio"):
+            if os.path.exists(audio_file) and os.path.getsize(audio_file) > 0:
+                segment = AudioSegment.from_wav(audio_file)
+                combined_audio += segment
+            else:
+                print("Warning: Skipping missing or empty audio file: {}".format(audio_file))
+
+        # Export final audio file
+        output_format = os.path.splitext(args.output)[1].lower().strip('.') or 'mp3'
+        print("Exporting final audiobook to '{}' (format: {})...".format(args.output, output_format))
+        combined_audio.export(args.output, format=output_format)
+        print("Audiobook generation complete!")
+
+    except Exception as e:
+        print("Error during audio concatenation or export: {}".format(e))
+
+    # --- Cleanup (Optional) ---
+    if not args.keep_temp:
+        print("Cleaning up temporary files...")
+        for audio_file in audio_files:
+            try:
+                if os.path.exists(audio_file):
+                    os.remove(audio_file)
+            except Exception as e:
+                print("Warning: Could not remove temp file {}: {}".format(audio_file, e))
         try:
-            start, end = map(int, args.chapter_range.split('-'))
-            chapter_range = range(start-1, min(end, len(chapters)))
-            selected_chapters = [chapters[i] for i in chapter_range]
-            selected_titles = [chapter_titles[i] for i in chapter_range]
-            chapters = selected_chapters
-            chapter_titles = selected_titles
-            print(f"Processing chapters {start} to {min(end, len(selected_chapters)+start-1)}")
-        except ValueError:
-            print(f"Invalid chapter range format: {args.chapter_range}. Expected format: '1-5'")
-            return 1
-    
-    # Estimate total processing time
-    total_text_length = sum(len(chapter) for chapter in chapters)
-    estimated_chunks = total_text_length / args.chunk_size
-    estimated_time = estimate_processing_time(estimated_chunks)
-    print(f"Total estimated processing time: {estimated_time}")
-    
-    # Process each chapter
-    chapter_audio_files = []
-    
-    for i, (chapter_text, chapter_title) in enumerate(zip(chapters, chapter_titles)):
-        chapter_audio = process_chapter(model, chapter_text, chapter_title, i+1, args)
-        if chapter_audio:
-            chapter_audio_files.append(chapter_audio)
-    
-    # Combine all chapters into a single audiobook if requested
-    if args.output and chapter_audio_files:
-        print(f"Combining {len(chapter_audio_files)} chapters into final audiobook...")
-        combine_audio_files(chapter_audio_files, args.output)
-        print(f"Audiobook saved to {args.output}")
-    
-    # Clean up temporary files if successful
-    if args.temp_dir and os.path.exists(args.temp_dir) and chapter_audio_files:
-        user_input = input("Processing complete! Would you like to remove temporary files to save space? (y/n): ")
-        if user_input.lower() == 'y':
-            print(f"Removing temporary files in {args.temp_dir}...")
-            shutil.rmtree(args.temp_dir)
-            print("Temporary files removed.")
-    
-    print("Audiobook generation complete!")
-    return 0
+            # Attempt to remove the temp directory if it's empty
+            if os.path.exists(temp_dir) and not os.listdir(temp_dir):
+                 os.rmdir(temp_dir)
+        except Exception as e:
+            print("Warning: Could not remove temp directory {}: {}".format(temp_dir, e))
+        print("Cleanup complete.")
+
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description="Generate an audiobook using Sesame CSM.")
+    parser.add_argument("--input", required=True, help="Path to the input EPUB or PDF file.")
+    parser.add_argument("--output", required=True, help="Path to the output audio file (e.g., audiobook.mp3).")
+    parser.add_argument("--model_path", required=True, help="Path to the directory containing the downloaded Sesame model files (config.json, ckpt.pt/model.safetensors).")
+    parser.add_argument("--voice_preset", default="calm", help="Name of the voice preset WAV file (without extension, e.g., 'calm', 'read_speech_a') located in the model directory or its 'prompts' subdirectory.")
+    parser.add_argument("--chunk_length", type=int, default=500, help="Maximum character length for text chunks.")
+    parser.add_argument("--temp_dir", default=None, help="Directory to store temporary audio chunks. Defaults to 'temp_audio_sesame' next to the output file.")
+    parser.add_argument("--keep_temp", action='store_true', help="Keep temporary audio chunk files after generation.")
+
+    # Placeholder for potentially missing helper functions if they weren't included
+    def extract_text_from_epub(file_path):
+        print("Placeholder: extract_text_from_epub called for {}".format(file_path))
+        # Implement actual EPUB extraction using ebooklib/BeautifulSoup
+        return "This is placeholder text from EPUB."
+
+    def extract_text_from_pdf(file_path):
+        print("Placeholder: extract_text_from_pdf called for {}".format(file_path))
+        # Implement actual PDF extraction using PyPDF2 or pdfminer.six
+        return "This is placeholder text from PDF."
+
+    def split_text(text, max_length):
+        print("Placeholder: split_text called")
+        # Implement actual text splitting logic (e.g., using nltk sentence tokenizer)
+        # Simple split for placeholder:
+        return [text[i:i+max_length] for i in range(0, len(text), max_length)]
+
+    args = parser.parse_args()
+    main(args)

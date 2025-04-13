@@ -353,7 +353,7 @@ docker run --runtime nvidia --rm \
   --volume ~/audiobook:/books \
   --volume ~/huggingface_models/sesame-csm-1b:/models/sesame-csm-1b \
   --workdir /audiobook_data \
-  sesame-tts python /books/generate_audiobook_sesame.py \
+  sesame-tts python3 /books/generate_audiobook_sesame.py \
   --input /books/your_book.epub \
   --output /audiobook_data/audiobook_sesame.mp3 \
   --model_path /models/sesame-csm-1b \
@@ -372,7 +372,7 @@ When using the interactive mode, you can then run commands inside the container,
 
 ```bash
 # Generate an audiobook using Sesame (inside container)
-python /books/generate_audiobook_sesame.py \
+python3 /books/generate_audiobook_sesame.py \
   --input /books/your_book.epub \
   --output /audiobook_data/audiobook_sesame.mp3 \
   --model_path /models/sesame-csm-1b \
