@@ -31,8 +31,8 @@ RUN python3 -c "import nltk; nltk.download('punkt')"
 
 # --- Pre-install silentcipher with modified dependencies ---
 WORKDIR /opt
-# Clone silentcipher using HTTP
-RUN git clone http://github.com/SesameAILabs/silentcipher.git
+# Clone silentcipher using HTTP and disable terminal prompt
+RUN GIT_TERMINAL_PROMPT=0 git clone http://github.com/SesameAILabs/silentcipher.git
 WORKDIR /opt/silentcipher
 # Relax numpy and scipy requirements in silentcipher's setup files
 RUN sed -i "s/numpy>=[0-9.]*/numpy/" setup.py requirements.txt || true
@@ -43,8 +43,8 @@ RUN pip install .
 
 # --- Install CSM dependencies and CSM itself ---
 WORKDIR /opt
-# Clone and install mimi locally using HTTP
-RUN git clone http://github.com/SesameAILabs/mimi.git && \
+# Clone and install mimi locally using HTTP and disable terminal prompt
+RUN GIT_TERMINAL_PROMPT=0 git clone http://github.com/SesameAILabs/mimi.git && \
     cd mimi && \
     pip install . && \
     cd .. && \
@@ -53,8 +53,8 @@ RUN git clone http://github.com/SesameAILabs/mimi.git && \
 # Install other specific CSM dependencies (ignore versions for broader compatibility initially)
 RUN pip install einops rotary_embedding_torch vector_quantize_pytorch xformers accelerate
 
-# Clone CSM repo using HTTP
-RUN git clone http://github.com/SesameAILabs/csm.git
+# Clone CSM repo using HTTP and disable terminal prompt
+RUN GIT_TERMINAL_PROMPT=0 git clone http://github.com/SesameAILabs/csm.git
 WORKDIR /opt/csm
 # Remove dependencies we installed manually or are in the base image from setup.py
 RUN sed -i '/^transformers/d' setup.py && \
