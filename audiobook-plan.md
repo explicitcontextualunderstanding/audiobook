@@ -300,55 +300,74 @@ python generate_audiobook_sesame_epub.py \
 
 For a more streamlined experience, similar to the Piper TTS approach, you can use the included Docker container for Sesame CSM:
 
+**Important Pre-requisite: Download the Model Manually**
+
+The `sesame/csm-1b` model requires authentication. You need to download it manually on your host machine first.
+
+1.  **Install Hugging Face Hub CLI:**
+    ```bash
+    pip install -U huggingface_hub
+    ```
+2.  **Log in:**
+    ```bash
+    huggingface-cli login
+    # Follow the prompts, you might need to create a token on huggingface.co
+    ```
+3.  **Download the model:** This will download the model files to a local cache directory (usually `~/.cache/huggingface/hub/models--sesame--csm-1b`).
+    ```bash
+    huggingface-cli download sesame/csm-1b --local-dir ~/huggingface_models/sesame-csm-1b --local-dir-use-symlinks False
+    # We use a specific local dir and disable symlinks for easier mounting into Docker.
+    # Make sure the directory ~/huggingface_models exists or adjust the path.
+    mkdir -p ~/huggingface_models
+    ```
+    *Note: You may need to visit the model page on Hugging Face first (https://huggingface.co/sesame/csm-1b) and accept any terms or agreements.*
+
+Now you can proceed with building and running the container.
+
 ```bash
 # Option 1: Using the quickstart.sh script (recommended)
-./quickstart.sh your_book.epub sesame
+# The quickstart script needs modification to handle the pre-downloaded model.
+# (Future improvement: Update quickstart.sh to detect/mount ~/huggingface_models/sesame-csm-1b)
+# For now, use Option 2 (Manual Docker) for Sesame.
+# ./quickstart.sh your_book.epub sesame
 
 # Option 2: Manual Docker approach
 # Check if sesame-tts image exists, build if not
 if ! docker image inspect sesame-tts &>/dev/null; then
     echo "Building Sesame TTS Docker container..."
-    
-    # Build using the included Dockerfile
-    # Navigate to your audiobook project directory first if you aren't already there
-    # cd ~/audiobook 
-    # This build is generally less memory-intensive than the Piper build
-    # NOTE: The provided Dockerfile (docker/sesame-tts/Dockerfile) has been modified
-    # to work around dependency conflicts encountered with the base image's Python version (3.8).
-    # Modifications include:
-    #   - Installing Rust/Cargo (required by 'tokenizers').
-    #   - Pre-installing the 'silentcipher' dependency with relaxed 'numpy' and 'scipy' version requirements.
-    #   - Removing specific version pins for 'transformers', 'moshi', and 'torchtune' during 'csm' installation.
-    # These changes allow the build to complete but might lead to runtime issues if the removed/relaxed
-    # dependencies were critical in their specific versions.
+    # Build using the modified Dockerfile (model download step removed)
     sudo docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
 fi
 
-# Run the container with direct script execution
+# Run the container with direct script execution, mounting the downloaded model
 docker run --runtime nvidia --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
+  --volume ~/huggingface_models/sesame-csm-1b:/models/sesame-csm-1b \
   --workdir /audiobook_data \
   sesame-tts python /books/generate_audiobook_sesame.py \
   --input /books/your_book.epub \
   --output /audiobook_data/audiobook_sesame.mp3 \
+  --model_path /models/sesame-csm-1b \
   --voice_preset "calm"
 
-# Alternatively, run the container in interactive mode
+# Alternatively, run the container in interactive mode, mounting the model
 docker run --runtime nvidia -it --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
+  --volume ~/huggingface_models/sesame-csm-1b:/models/sesame-csm-1b \
   --workdir /audiobook_data \
   sesame-tts
 ```
 
-When using the interactive mode, you can then run commands inside the container:
+When using the interactive mode, you can then run commands inside the container, specifying the model path:
 
 ```bash
 # Generate an audiobook using Sesame (inside container)
 python /books/generate_audiobook_sesame.py \
   --input /books/your_book.epub \
   --output /audiobook_data/audiobook_sesame.mp3 \
+  --model_path /models/sesame-csm-1b \
   --voice_preset "calm"
 ```
 
