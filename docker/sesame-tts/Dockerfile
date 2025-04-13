@@ -136,7 +136,7 @@ except Exception as e:\n\
     sys.exit(1)\n\
 ' > /usr/local/bin/utils/test_csm.py && chmod +x /usr/local/bin/utils/test_csm.py
 
-# Create entrypoint script
+# Create entrypoint script with fixed syntax
 RUN echo '#!/bin/bash\n\
 \n\
 echo "=================================================="\n\
