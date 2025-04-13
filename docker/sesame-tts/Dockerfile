@@ -1,12 +1,17 @@
 FROM dustynv/l4t-pytorch:r35.4.1
 
-# Install system dependencies
+# Install system dependencies including curl for rustup
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
     python3-pip \
+    curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Rust/Cargo
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir \
