@@ -38,9 +38,11 @@ WORKDIR /opt
 RUN git clone https://github.com/SesameAILabs/csm.git && \
     cd csm && \
     # Remove specific version requirements causing conflicts
-    sed -i '/^transformers==/d' requirements.txt && \
-    sed -i '/^moshi==/d' requirements.txt && \
-    sed -i '/^torchtune==/d' requirements.txt && \
+    # Note: Some might be in requirements.txt, others in setup.py
+    sed -i '/^transformers==/d' requirements.txt setup.py && \
+    sed -i '/^moshi==/d' requirements.txt setup.py && \
+    sed -i '/^torchtune==/d' requirements.txt setup.py && \
+    sed -i '/silentcipher @ git/d' setup.py && \
     pip install -e .
 
 # Download the model
