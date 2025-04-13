@@ -57,12 +57,14 @@ RUN git clone https://github.com/SesameAILabs/csm.git && \
     sed -i '/silentcipher @ git/d' setup.py
 
 # Copy CSM source directly into site-packages
-# Determine site-packages path (adjust if base image Python version changes)
-# For python3.8 in the base image:
-ENV SITE_PACKAGES=/usr/local/lib/python3.8/dist-packages
-RUN mkdir -p ${SITE_PACKAGES} && \
+# Hardcode site-packages path for python3.8
+RUN mkdir -p /usr/local/lib/python3.8/dist-packages && \
     # Copy the actual 'csm' package directory from the cloned repo
-    cp -r /opt/csm/csm ${SITE_PACKAGES}/csm
+    cp -r /opt/csm/csm /usr/local/lib/python3.8/dist-packages/csm && \
+    # Verify that the copy happened and list contents
+    echo "--- Verifying CSM copy in site-packages ---" && \
+    ls -l /usr/local/lib/python3.8/dist-packages/csm && \
+    echo "--- Verification complete ---"
 
 # Download the model - REMOVED FROM DOCKERFILE
 # RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
