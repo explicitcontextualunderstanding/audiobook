@@ -57,6 +57,12 @@ RUN git clone https://github.com/SesameAILabs/csm.git && \
     sed -i '/silentcipher @ git/d' setup.py && \
     # Go back to /opt before copying
     cd .. && \
+    # --- Add verification before copy ---
+    echo "--- Verifying /opt contents before copy ---" && \
+    ls -l /opt && \
+    echo "--- Verifying /opt/csm contents before copy ---" && \
+    ls -l /opt/csm && \
+    # --- End verification ---
     # Copy CSM source directly into site-packages (hardcoded path for python3.8)
     mkdir -p /usr/local/lib/python3.8/dist-packages && \
     cp -r /opt/csm/csm /usr/local/lib/python3.8/dist-packages/csm && \
