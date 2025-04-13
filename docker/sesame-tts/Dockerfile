@@ -33,7 +33,7 @@ RUN pip3 install --no-cache-dir \
 # Download NLTK data
 RUN python3 -c "import nltk; nltk.download('punkt')"
 
-# --- Prepare silentcipher with modified dependencies ---
+# --- Pre-install silentcipher with modified dependencies ---
 WORKDIR /opt
 # Clone silentcipher
 RUN git clone https://github.com/SesameAILabs/silentcipher.git
@@ -41,9 +41,11 @@ WORKDIR /opt/silentcipher
 # Relax numpy and scipy requirements in silentcipher's setup files
 RUN sed -i "s/numpy>=[0-9.]*/numpy/" setup.py requirements.txt || true
 RUN sed -i "s/scipy>=[0-9.]*/scipy/" setup.py requirements.txt || true
-# --- End of silentcipher preparation ---
+# Install the modified silentcipher globally
+RUN pip install .
+# --- End of silentcipher pre-installation ---
 
-# Clone and install Sesame CSM, pointing it to the local silentcipher
+# Clone and install Sesame CSM
 WORKDIR /opt
 RUN git clone https://github.com/SesameAILabs/csm.git && \
     cd csm && \
@@ -51,9 +53,8 @@ RUN git clone https://github.com/SesameAILabs/csm.git && \
     sed -i '/^transformers==/d' requirements.txt setup.py && \
     sed -i '/^moshi==/d' requirements.txt setup.py && \
     sed -i '/^torchtune==/d' requirements.txt setup.py && \
-    # Modify setup.py to use the local silentcipher path
-    # This replaces the git URL with the local file path
-    sed -i "s|silentcipher @ git+https://github.com/SesameAILabs/silentcipher@master|silentcipher @ file:///opt/silentcipher|" setup.py && \
+    # Remove the silentcipher dependency line entirely from setup.py
+    sed -i '/silentcipher @ git/d' setup.py && \
     pip install -e .
 
 # Download the model
