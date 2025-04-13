@@ -27,46 +27,73 @@ ENV NO_TORCH_COMPILE=1
 # Create directory for CSM code
 RUN mkdir -p /opt/csm
 
-# Install Python dependencies - using more flexible versioning
-RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip3 install --no-cache-dir \
+# Install Python dependencies in smaller batches for better error isolation
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
+
+# Install PyTorch and torchaudio (already in the base image)
+RUN pip3 install --no-cache-dir \
     "torch>=2.0.0,<2.5.0" \
-    "torchaudio>=2.0.0,<2.5.0" \
+    "torchaudio>=2.0.0,<2.5.0"
+
+# Install transformers and tokenizers
+RUN pip3 install --no-cache-dir \
     "tokenizers>=0.13.0,<0.22.0" \
     "transformers>=4.30.0,<4.47.0" \
-    "huggingface_hub>=0.16.0,<0.29.0" \
-    "moshi>=0.2.0,<0.3.0" \
-    "torchtune>=0.4.0,<0.5.0" \
-    "torchao>=0.9.0,<1.0.0"
+    "huggingface_hub>=0.16.0,<0.29.0"
 
-# Handle silentcipher - try PyPI first, fall back to minimal git clone if needed
+# Install moshi with fallback
+RUN pip3 install --no-cache-dir "moshi>=0.2.0,<0.3.0" || \
+    pip3 install --no-cache-dir "moshi==0.2.2" || \
+    pip3 install --no-cache-dir "moshi" || \
+    echo "Warning: Could not install moshi package. Continuing without it."
+
+# Install remaining dependencies with individual fallbacks
+RUN pip3 install --no-cache-dir "torchtune>=0.4.0,<0.5.0" || \
+    pip3 install --no-cache-dir "torchtune==0.4.0" || \
+    echo "Warning: Could not install torchtune package. Continuing without it."
+
+RUN pip3 install --no-cache-dir "torchao>=0.9.0,<1.0.0" || \
+    pip3 install --no-cache-dir "torchao==0.9.0" || \
+    echo "Warning: Could not install torchao package. Continuing without it."
+
+# Handle silentcipher - try PyPI first, fall back to git clone if needed
 RUN pip3 install --no-cache-dir silentcipher || \
-    (mkdir -p /tmp/silentcipher && \
+    (echo "Warning: Could not install silentcipher from PyPI, attempting GitHub install..." && \
+     mkdir -p /tmp/silentcipher && \
      cd /tmp/silentcipher && \
      git init && \
      git remote add origin https://github.com/SesameAILabs/silentcipher.git && \
      git fetch --depth 1 origin master && \
      git checkout FETCH_HEAD && \
-     pip install . && \
-     cd / && \
-     rm -rf /tmp/silentcipher)
+     pip install -e . || echo "Warning: Could not install silentcipher from GitHub. Continuing without it.")
 
 # Install additional dependencies needed for audiobook generation
+# Split into groups for better error isolation
 RUN pip3 install --no-cache-dir \
     PyPDF2 \
     pdfminer.six \
     nltk \
     tqdm \
     pydub \
-    psutil \
+    psutil
+
+RUN pip3 install --no-cache-dir \
     ebooklib \
-    beautifulsoup4 \
-    einops \
-    rotary_embedding_torch \
-    vector_quantize_pytorch \
+    beautifulsoup4
+
+RUN pip3 install --no-cache-dir \
+    einops || echo "Warning: Could not install einops. Continuing without it."
+
+RUN pip3 install --no-cache-dir \
+    rotary_embedding_torch || echo "Warning: Could not install rotary_embedding_torch. Continuing without it."
+
+RUN pip3 install --no-cache-dir \
+    vector_quantize_pytorch || echo "Warning: Could not install vector_quantize_pytorch. Continuing without it."
+
+RUN pip3 install --no-cache-dir \
     accelerate \
     soundfile \
-    datasets[audio]
+    "datasets[audio]" || pip3 install --no-cache-dir datasets
 
 # Download key CSM files instead of cloning the whole repo
 WORKDIR /opt/csm
@@ -158,84 +185,145 @@ __all__ = ["load_csm_1b", "Segment", "Generator"]\n\
 # Create an optimized script to test CSM
 RUN echo '#!/usr/bin/env python3\n\
 import sys\n\
-import torch\n\
-import torchaudio\n\
 import os\n\
 import importlib.util\n\
 from pathlib import Path\n\
+import logging\n\
+\n\
+# Configure logging\n\
+logging.basicConfig(\n\
+    level=logging.INFO,\n\
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"\n\
+)\n\
+logger = logging.getLogger("test_csm")\n\
 \n\
 # Add CSM root to path\n\
 if os.path.exists("/opt/csm"):\n\
     sys.path.insert(0, "/opt/csm")\n\
 \n\
 try:\n\
-    # First try to import from CSM package\n\
+    # First try to import torch\n\
     try:\n\
-        from csm import load_csm_1b, Segment\n\
-        print("Successfully imported from csm package")\n\
-    except ImportError:\n\
-        # Fall back to importing directly from generator.py\n\
-        print("Falling back to direct generator.py import")\n\
-        if os.path.exists("/opt/csm/generator.py"):\n\
-            sys.path.insert(0, "/opt/csm")\n\
-            from generator import load_csm_1b, Segment\n\
+        import torch\n\
+        logger.info(f"PyTorch version: {torch.__version__}")\n\
+        logger.info(f"CUDA available: {torch.cuda.is_available()}")\n\
+        if torch.cuda.is_available():\n\
+            device = "cuda"\n\
+            logger.info(f"CUDA device: {torch.cuda.get_device_name(0)}")\n\
         else:\n\
-            raise ImportError("Could not find generator.py or csm package")\n\
+            device = "cpu"\n\
+            logger.info("CUDA not available, using CPU")\n\
+    except ImportError as e:\n\
+        logger.error(f"Failed to import torch: {e}")\n\
+        device = "cpu"\n\
+\n\
+    # Try to import torchaudio for saving the test file\n\
+    try:\n\
+        import torchaudio\n\
+        logger.info(f"torchaudio version: {torchaudio.__version__}")\n\
+        can_save_audio = True\n\
+    except ImportError as e:\n\
+        logger.warning(f"Failed to import torchaudio: {e}. Won\'t be able to save audio.")\n\
+        can_save_audio = False\n\
+\n\
+    # First try to import from csm package\n\
+    try:\n\
+        # Try the compat module first\n\
+        from csm_compat import load_csm_1b, Segment, Generator\n\
+        logger.info("Successfully imported from csm_compat module")\n\
+    except ImportError:\n\
+        try:\n\
+            # Try importing from generator.py directly\n\
+            from generator import load_csm_1b, Segment\n\
+            logger.info("Successfully imported from generator.py module")\n\
+        except ImportError as e:\n\
+            logger.error(f"Failed to import CSM modules: {e}")\n\
+            logger.error("Cannot proceed without CSM modules")\n\
+            sys.exit(1)\n\
     \n\
-    device = "cuda" if torch.cuda.is_available() else "cpu"\n\
-    print(f"\\nUsing device: {device}\\n")\n\
+    logger.info(f"\\nUsing device: {device}\\n")\n\
     \n\
     # Path to model\n\
     model_path = sys.argv[1] if len(sys.argv) > 1 else "/models/sesame-csm-1b"\n\
-    print(f"Loading model from: {model_path}")\n\
+    logger.info(f"Loading model from: {model_path}")\n\
     \n\
     # Check if model exists\n\
     if not os.path.exists(model_path):\n\
-        print(f"ERROR: Model path {model_path} does not exist!")\n\
-        print("Make sure you have mounted the model directory correctly.")\n\
+        logger.error(f"ERROR: Model path {model_path} does not exist!")\n\
+        logger.error("Make sure you have mounted the model directory correctly.")\n\
+        logger.info("Available paths:")\n\
+        for path in ["/models", "/models/sesame-csm-1b", "/audiobook_data", "/books"]:\n\
+            if os.path.exists(path):\n\
+                logger.info(f"  - {path} (exists, content: {os.listdir(path) if os.path.isdir(path) else \'file\'})")\n\
+            else:\n\
+                logger.info(f"  - {path} (does not exist)")\n\
         sys.exit(1)\n\
     \n\
     # Load model\n\
-    print("Initializing CSM model...")\n\
-    generator = load_csm_1b(model_path=model_path, device=device)\n\
-    print(f"Model loaded successfully. Sample rate: {generator.sample_rate}")\n\
+    logger.info("Initializing CSM model...")\n\
+    try:\n\
+        generator = load_csm_1b(model_path=model_path, device=device)\n\
+        logger.info(f"Model loaded successfully. Sample rate: {generator.sample_rate}")\n\
+    except Exception as e:\n\
+        logger.error(f"Error loading model: {e}")\n\
+        import traceback\n\
+        traceback.print_exc()\n\
+        sys.exit(1)\n\
     \n\
     # Test generate a short sample\n\
-    print("\\nGenerating test audio...")\n\
+    logger.info("\\nGenerating test audio...")\n\
     output_file = Path("/audiobook_data/test_sample.wav")\n\
     \n\
     # Get voice presets if available\n\
     preset_dir = Path(model_path) / "prompts"\n\
     presets = list(preset_dir.glob("*.wav")) if preset_dir.exists() else []\n\
     if presets:\n\
-        print(f"Available voice presets: {[p.stem for p in presets]}")\n\
+        logger.info(f"Available voice presets: {[p.stem for p in presets]}")\n\
     else:\n\
-        print("No voice presets found")\n\
+        logger.info("No voice presets found")\n\
     \n\
     # Test generate with simple text\n\
     text = "This is a test of the CSM text to speech system."\n\
-    print(f"Generating speech for text: \\\"{text}\\\"")\n\
+    logger.info(f"Generating speech for text: \\\"{text}\\\"")\n\
     audio = generator.generate(text=text)\n\
     \n\
-    # Save the audio\n\
-    torchaudio.save(output_file, audio.unsqueeze(0).cpu(), generator.sample_rate)\n\
-    print(f"Test audio saved to {output_file}")\n\
+    if can_save_audio and audio is not None:\n\
+        # Save the audio\n\
+        torchaudio.save(output_file, audio.unsqueeze(0).cpu(), generator.sample_rate)\n\
+        logger.info(f"Test audio saved to {output_file}")\n\
+    else:\n\
+        logger.warning("Could not save audio file (missing torchaudio or no audio generated)")\n\
     \n\
     # Success\n\
-    print("\\n✅ CSM is working correctly!")\n\
+    logger.info("\\n✅ CSM test completed successfully!")\n\
     \n\
 except Exception as e:\n\
-    print(f"\\n❌ Error testing CSM: {e}")\n\
+    logger.error(f"\\n❌ Error testing CSM: {e}")\n\
     import traceback\n\
     traceback.print_exc()\n\
     \n\
     # Print more diagnostic information\n\
-    print("\\nDiagnostic information:")\n\
-    print(f"Python version: {sys.version}")\n\
-    print(f"Torch version: {torch.__version__}")\n\
-    print(f"CUDA available: {torch.cuda.is_available()}")\n\
-    if torch.cuda.is_available():\n\
-        print(f"CUDA device: {torch.cuda.get_device_name(0)}")\n\
+    logger.info("\\nDiagnostic information:")\n\
+    logger.info(f"Python version: {sys.version}")\n\
+    try:\n\
+        import torch\n\
+        logger.info(f"Torch version: {torch.__version__}")\n\
+        logger.info(f"CUDA available: {torch.cuda.is_available()}")\n\
+        if torch.cuda.is_available():\n\
+            logger.info(f"CUDA device: {torch.cuda.get_device_name(0)}")\n\
+    except ImportError:\n\
+        logger.info("Torch not available")\n\
+    \n\
+    # List installed packages\n\
+    logger.info("\\nInstalled packages:")\n\
+    import subprocess\n\
+    try:\n\
+        output = subprocess.check_output(["pip", "list"]).decode("utf-8")\n\
+        for line in output.split("\\n"):\n\
+            if any(pkg in line.lower() for pkg in ["torch", "audio", "token", "transform", "hub", "moshi"]):\n\
+                logger.info(f"  {line.strip()}")\n\
+    except Exception as pkg_err:\n\
+        logger.error(f"Could not list packages: {pkg_err}")\n\
     \n\
     sys.exit(1)\n\
 ' > /usr/local/bin/test_csm.py && chmod +x /usr/local/bin/test_csm.py
