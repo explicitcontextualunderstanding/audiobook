@@ -136,33 +136,32 @@ except Exception as e:\n\
     sys.exit(1)\n\
 ' > /usr/local/bin/utils/test_csm.py && chmod +x /usr/local/bin/utils/test_csm.py
 
-# Create entrypoint script with fixed syntax
-RUN echo '#!/bin/bash\n\
-\n\
-echo "=================================================="\n\
-echo "Sesame CSM Audiobook Generator for Jetson"\n\
-echo "=================================================="\n\
-echo ""\n\
-echo "Available commands:"\n\
-echo ""\n\
-echo "  • Test CSM installation:"\n\
-echo "    python /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b"\n\
-echo ""\n\
-echo "  • Generate audiobook:"\n\
-echo "    python /books/generate_audiobook_sesame.py \\"\n\
-echo "      --input /books/your_book.epub \\"\n\
-echo "      --output /audiobook_data/audiobook.mp3 \\"\n\
-echo "      --model_path /models/sesame-csm-1b"\n\
-echo ""\n\
-echo "Volume mounts:"\n\
-echo "  • /models/sesame-csm-1b: Model files"\n\
-echo "  • /books: Source books"\n\
-echo "  • /audiobook_data: Output directory"\n\
-echo ""\n\
-echo "=================================================="\n\
-\n\
-exec "$@"\n\
-' > /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
+# Create the entrypoint script directly as a file
+RUN echo '#!/bin/bash
+
+echo "=================================================="
+echo "Sesame CSM Audiobook Generator for Jetson"
+echo "=================================================="
+echo ""
+echo "Available commands:"
+echo ""
+echo "  • Test CSM installation:"
+echo "    python /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b"
+echo ""
+echo "  • Generate audiobook:"
+echo "    python /books/generate_audiobook_sesame.py \\
+      --input /books/your_book.epub \\
+      --output /audiobook_data/audiobook.mp3 \\
+      --model_path /models/sesame-csm-1b"
+echo ""
+echo "Volume mounts:"
+echo "  • /models/sesame-csm-1b: Model files"
+echo "  • /books: Source books"
+echo "  • /audiobook_data: Output directory"
+echo ""
+echo "=================================================="
+
+exec "$@"' > /usr/local/bin/entrypoint.sh && chmod +x /usr/local/bin/entrypoint.sh
 
 # Set working directory
 WORKDIR /audiobook_data
