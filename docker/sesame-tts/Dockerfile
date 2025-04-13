@@ -33,6 +33,18 @@ RUN pip3 install --no-cache-dir \
 # Download NLTK data
 RUN python3 -c "import nltk; nltk.download('punkt')"
 
+# --- Pre-install silentcipher with modified dependencies ---
+WORKDIR /opt
+# Clone silentcipher
+RUN git clone https://github.com/SesameAILabs/silentcipher.git
+WORKDIR /opt/silentcipher
+# Relax numpy requirement in silentcipher's setup.py (assuming it's there)
+# This changes 'numpy>=1.25.2' (or similar) to just 'numpy'
+RUN sed -i "s/numpy>=[0-9.]*/numpy/" setup.py requirements.txt || true
+# Install the modified silentcipher
+RUN pip install .
+# --- End of silentcipher pre-installation ---
+
 # Clone and install Sesame CSM
 WORKDIR /opt
 RUN git clone https://github.com/SesameAILabs/csm.git && \
@@ -42,6 +54,7 @@ RUN git clone https://github.com/SesameAILabs/csm.git && \
     sed -i '/^transformers==/d' requirements.txt setup.py && \
     sed -i '/^moshi==/d' requirements.txt setup.py && \
     sed -i '/^torchtune==/d' requirements.txt setup.py && \
+    # Attempt to remove silentcipher dep from csm (might be redundant now, but safe)
     sed -i '/silentcipher @ git/d' setup.py && \
     pip install -e .
 
