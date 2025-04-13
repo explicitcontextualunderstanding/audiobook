@@ -490,3 +490,40 @@ Try these solutions if the build failed:
     ```
 
 5.  **Use Sesame Approach**: If the Piper container build consistently fails, consider using the Sesame CSM approach instead, which uses a pre-built container or a simpler build process described in section 4.4.
+
+## 7. Docker Build Troubleshooting History (Sesame TTS Image)
+
+This section documents the errors encountered during the build process for the `sesame-tts` Docker image and the solutions attempted.
+
+1.  **Initial Error:** `ModuleNotFoundError: No module named 'csm'` (Runtime)
+    *   **Cause:** Python couldn't find the `csm` package installed via `pip install -e .` or other methods.
+    *   **Attempt 1:** Add `/opt/csm` to `sys.path` in the Python script. (Ineffective)
+    *   **Attempt 2:** Modify Dockerfile to copy `csm` source code directly into `site-packages`. (Led to build errors)
+
+2.  **Build Error:** `cp: cannot stat '/opt/csm/csm': No such file or directory`
+    *   **Cause 1:** `git clone` and `cp` were in separate `RUN` layers, build context was lost.
+    *   **Solution 1:** Combine `git clone`, `sed` modifications, and `cp` into a single `RUN` layer. (Error persisted)
+    *   **Cause 2:** Incorrect source path assumption. Verification (`ls`) showed the structure was `/opt/csm/*.py`, not `/opt/csm/csm/`.
+    *   **Solution 2:** Corrected `cp` command to copy `/opt/csm/*.py`. (Led to parse error)
+
+3.  **Build Error:** `dockerfile parse error ... unknown instruction: packages`
+    *   **Cause:** Extraneous text accidentally left in the Dockerfile during edits.
+    *   **Solution:** Removed the invalid lines. (Build succeeded, but runtime `ModuleNotFoundError` returned)
+
+4.  **Decision:** Revert the source code copying approach and follow the updated `csm` README instructions using `pip install`.
+
+5.  **Build Error:** `fatal: could not read Username for 'https://github.com': No such device or address` (during `pip install git+https://...mimi.git`)
+    *   **Cause:** `pip`'s internal `git` call failed, likely due to authentication/prompt issues in the non-interactive Docker build environment.
+    *   **Solution 1:** Replace `pip install git+...` with `git clone` followed by `pip install .` locally. (Led to `git clone` error)
+
+6.  **Build Error:** `fatal: could not read Username for 'https://github.com': No such device or address` (during `git clone https://...`)
+    *   **Cause:** Direct `git clone` over HTTPS failed for the same authentication/prompt reasons.
+    *   **Solution 1:** Switch `git clone` URLs from `https` to `http`. (Error persisted, message still mentioned `https`)
+
+7.  **Build Error:** `fatal: could not read Username for 'https://github.com': terminal prompts disabled` (during `git clone http://...`)
+    *   **Cause:** Git still attempting authentication despite HTTP URL, possibly due to redirects or config. Terminal prompts explicitly disabled.
+    *   **Solution 1:** Add `GIT_TERMINAL_PROMPT=0` environment variable before `git clone` commands. (Error persisted)
+
+8.  **Build Error:** `unzip: cannot find zipfile directory...`
+    *   **Cause:** Switched from `git clone` to `curl` to download zip archives. `curl` downloaded an invalid/empty file.
+    *   **Solution 1:** Replace `curl` with `wget` for downloading zip archives. (Current approach)

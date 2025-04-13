@@ -1,6 +1,6 @@
 FROM dustynv/l4t-pytorch:r35.4.1
 
-# Install system dependencies including curl, git (still needed for pip?), and unzip
+# Install system dependencies including wget and unzip
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
@@ -8,6 +8,7 @@ RUN apt-get update && apt-get install -y \
     git \
     curl \
     unzip \
+    wget \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -32,8 +33,8 @@ RUN python3 -c "import nltk; nltk.download('punkt')"
 
 # --- Pre-install silentcipher with modified dependencies ---
 WORKDIR /opt
-# Download and unzip silentcipher
-RUN curl -L -o silentcipher.zip https://github.com/SesameAILabs/silentcipher/archive/refs/heads/main.zip && \
+# Download and unzip silentcipher using wget
+RUN wget https://github.com/SesameAILabs/silentcipher/archive/refs/heads/main.zip -O silentcipher.zip && \
     unzip silentcipher.zip && \
     rm silentcipher.zip && \
     # Rename extracted folder (usually repo-branch)
@@ -44,12 +45,13 @@ WORKDIR /opt/silentcipher
 RUN sed -i "s/numpy>=[0-9.]*/numpy/" setup.py requirements.txt || true
 RUN sed -i "s/scipy>=[0-9.]*/scipy/" setup.py requirements.txt || true
 RUN pip install .
+
 # --- End silentcipher ---
 
 # --- Install CSM dependencies and CSM itself ---
 WORKDIR /opt
-# Download, unzip, and install mimi locally
-RUN curl -L -o mimi.zip https://github.com/SesameAILabs/mimi/archive/refs/heads/main.zip && \
+# Download, unzip, and install mimi locally using wget
+RUN wget https://github.com/SesameAILabs/mimi/archive/refs/heads/main.zip -O mimi.zip && \
     unzip mimi.zip && \
     rm mimi.zip && \
     # Rename extracted folder
@@ -62,8 +64,8 @@ RUN curl -L -o mimi.zip https://github.com/SesameAILabs/mimi/archive/refs/heads/
 # Install other specific CSM dependencies
 RUN pip install einops rotary_embedding_torch vector_quantize_pytorch xformers accelerate
 
-# Download and unzip CSM repo
-RUN curl -L -o csm.zip https://github.com/SesameAILabs/csm/archive/refs/heads/main.zip && \
+# Download and unzip CSM repo using wget
+RUN wget https://github.com/SesameAILabs/csm/archive/refs/heads/main.zip -O csm.zip && \
     unzip csm.zip && \
     rm csm.zip && \
     # Rename extracted folder
