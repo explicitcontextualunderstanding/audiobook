@@ -37,8 +37,9 @@ RUN python3 -c "import nltk; nltk.download('punkt')"
 WORKDIR /opt
 RUN git clone https://github.com/SesameAILabs/csm.git && \
     cd csm && \
-    # Remove the specific transformers version requirement
+    # Remove specific version requirements causing conflicts
     sed -i '/^transformers==/d' requirements.txt && \
+    sed -i '/^moshi==/d' requirements.txt && \
     pip install -e .
 
 # Download the model
