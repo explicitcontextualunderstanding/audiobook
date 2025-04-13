@@ -47,32 +47,40 @@ RUN pip install .
 
 # Clone, prepare, and copy Sesame CSM source in one step
 WORKDIR /opt
+# Note: All commands run relative to /opt unless changed by cd
 RUN git clone https://github.com/SesameAILabs/csm.git && \
+    # --- Verification after clone ---
+    echo "--- Verifying /opt contents after clone ---" && \
+    ls -l /opt && \
+    echo "--- Verifying /opt/csm contents after clone ---" && \
+    ls -l /opt/csm && \
+    # --- End verification ---
+    # Modify files inside /opt/csm
     cd csm && \
-    # Remove specific version requirements causing conflicts
     sed -i '/^transformers==/d' requirements.txt setup.py && \
     sed -i '/^moshi==/d' requirements.txt setup.py && \
     sed -i '/^torchtune==/d' requirements.txt setup.py && \
-    # Remove the silentcipher dependency line entirely from setup.py
     sed -i '/silentcipher @ git/d' setup.py && \
-    # Go back to /opt before copying
+    # Go back to /opt
     cd .. && \
-    # --- Add verification before copy ---
-    echo "--- Verifying /opt contents before copy ---" && \
-    ls -l /opt && \
-    echo "--- Verifying /opt/csm contents before copy ---" && \
-    ls -l /opt/csm && \
-    # --- End verification ---
     # Copy CSM source directly into site-packages (hardcoded path for python3.8)
-    mkdir -p /usr/local/lib/python3.8/dist-packages && \
-    cp -r /opt/csm/csm /usr/local/lib/python3.8/dist-packages/csm && \
-    # Verify that the copy happened and list contents
-    echo "--- Verifying CSM copy in site-packages ---" && \
-    ls -l /usr/local/lib/python3.8/dist-packages/csm && \
-    echo "--- Verification complete ---"
-
+    mkdir -p /usr/local/lib/python3.8/dist-packages && \&& \
+    # Source path is relative to /opt
+    cp -r csm/csm /usr/local/lib/python3.8/dist-packages/csm && \if any, and '*' to copy contents
+    # Verify that the copy happened and list contentse seem present)
+    echo "--- Verifying CSM copy in site-packages ---" && \kages/csm/ && \
+    ls -l /usr/local/lib/python3.8/dist-packages/csm && \'utils', they would be copied like:
+    echo "--- Verification complete ---"    # cp -r /opt/csm/utils /usr/local/lib/python3.8/dist-packages/csm/utils && \
+t exist in the source
 # Download the model - REMOVED FROM DOCKERFILE
-# RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
+# RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"    # Verify that the copy happened and list contents
+packages ---" && \
+# Create directories for mounting volumeskages/csm && \
+RUN mkdir -p /audiobook_data /books /models    echo "--- Verification complete ---"
+
+# Set working directoryREMOVED FROM DOCKERFILE
+
+WORKDIR /audiobook_data# RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
 
 # Create directories for mounting volumes
 RUN mkdir -p /audiobook_data /books /models
