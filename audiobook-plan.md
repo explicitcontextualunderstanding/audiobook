@@ -313,6 +313,14 @@ if ! docker image inspect sesame-tts &>/dev/null; then
     # Navigate to your audiobook project directory first if you aren't already there
     # cd ~/audiobook 
     # This build is generally less memory-intensive than the Piper build
+    # NOTE: The provided Dockerfile (docker/sesame-tts/Dockerfile) has been modified
+    # to work around dependency conflicts encountered with the base image's Python version (3.8).
+    # Modifications include:
+    #   - Installing Rust/Cargo (required by 'tokenizers').
+    #   - Pre-installing the 'silentcipher' dependency with relaxed 'numpy' and 'scipy' version requirements.
+    #   - Removing specific version pins for 'transformers', 'moshi', and 'torchtune' during 'csm' installation.
+    # These changes allow the build to complete but might lead to runtime issues if the removed/relaxed
+    # dependencies were critical in their specific versions.
     sudo docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
 fi
 
