@@ -63,15 +63,17 @@ RUN git clone https://github.com/SesameAILabs/csm.git && \
     sed -i '/silentcipher @ git/d' setup.py && \
     # Go back to /opt
     cd .. && \
-    # Copy CSM source directly into site-packages (hardcoded path for python3.8)
-    mkdir -p /usr/local/lib/python3.8/dist-packages && \&& \
-    # Source path is relative to /opt
-    cp -r csm/csm /usr/local/lib/python3.8/dist-packages/csm && \if any, and '*' to copy contents
-    # Verify that the copy happened and list contentse seem present)
-    echo "--- Verifying CSM copy in site-packages ---" && \kages/csm/ && \
-    ls -l /usr/local/lib/python3.8/dist-packages/csm && \'utils', they would be copied like:
-    echo "--- Verification complete ---"    # cp -r /opt/csm/utils /usr/local/lib/python3.8/dist-packages/csm/utils && \
-t exist in the source
+    # Create target directory in site-packages
+    mkdir -p /usr/local/lib/python3.8/dist-packages/csm && \
+    # Copy Python files from /opt/csm into the target directory
+    cp /opt/csm/*.py /usr/local/lib/python3.8/dist-packages/csm/ && \
+    # Create an empty __init__.py to ensure it's treated as a package
+    touch /usr/local/lib/python3.8/dist-packages/csm/__init__.py && \
+    # Verify that the copy happened and list contents
+    echo "--- Verifying CSM copy in site-packages ---" && \
+    ls -l /usr/local/lib/python3.8/dist-packages/csm && \
+    echo "--- Verification complete ---"
+
 # Download the model - REMOVED FROM DOCKERFILE
 # RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"    # Verify that the copy happened and list contents
 packages ---" && \
