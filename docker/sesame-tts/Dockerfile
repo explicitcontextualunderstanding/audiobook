@@ -45,7 +45,7 @@ RUN sed -i "s/scipy>=[0-9.]*/scipy/" setup.py requirements.txt || true
 RUN pip install .
 # --- End of silentcipher pre-installation ---
 
-# Clone and prepare Sesame CSM source
+# Clone, prepare, and copy Sesame CSM source in one step
 WORKDIR /opt
 RUN git clone https://github.com/SesameAILabs/csm.git && \
     cd csm && \
@@ -54,12 +54,11 @@ RUN git clone https://github.com/SesameAILabs/csm.git && \
     sed -i '/^moshi==/d' requirements.txt setup.py && \
     sed -i '/^torchtune==/d' requirements.txt setup.py && \
     # Remove the silentcipher dependency line entirely from setup.py
-    sed -i '/silentcipher @ git/d' setup.py
-
-# Copy CSM source directly into site-packages
-# Hardcode site-packages path for python3.8
-RUN mkdir -p /usr/local/lib/python3.8/dist-packages && \
-    # Copy the actual 'csm' package directory from the cloned repo
+    sed -i '/silentcipher @ git/d' setup.py && \
+    # Go back to /opt before copying
+    cd .. && \
+    # Copy CSM source directly into site-packages (hardcoded path for python3.8)
+    mkdir -p /usr/local/lib/python3.8/dist-packages && \
     cp -r /opt/csm/csm /usr/local/lib/python3.8/dist-packages/csm && \
     # Verify that the copy happened and list contents
     echo "--- Verifying CSM copy in site-packages ---" && \
