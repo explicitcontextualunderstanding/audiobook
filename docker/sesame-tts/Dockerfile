@@ -38,9 +38,10 @@ WORKDIR /opt
 # Clone silentcipher
 RUN git clone https://github.com/SesameAILabs/silentcipher.git
 WORKDIR /opt/silentcipher
-# Relax numpy requirement in silentcipher's setup.py (assuming it's there)
-# This changes 'numpy>=1.25.2' (or similar) to just 'numpy'
+# Relax numpy and scipy requirements in silentcipher's setup files
+# This changes 'numpy>=...' to just 'numpy', 'scipy>=...' to just 'scipy'
 RUN sed -i "s/numpy>=[0-9.]*/numpy/" setup.py requirements.txt || true
+RUN sed -i "s/scipy>=[0-9.]*/scipy/" setup.py requirements.txt || true
 # Install the modified silentcipher
 RUN pip install .
 # --- End of silentcipher pre-installation ---
