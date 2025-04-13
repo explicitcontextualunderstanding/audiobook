@@ -5,6 +5,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
     python3-pip \
+    git \
     curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
@@ -13,19 +14,14 @@ RUN apt-get update && apt-get install -y \
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
-# Install Python dependencies
+# Install base Python dependencies (already included: transformers, torch, torchaudio, numpy, scipy, librosa, soundfile)
 RUN pip3 install --no-cache-dir \
     PyPDF2 \
     pdfminer.six \
     nltk \
     tqdm \
     pydub \
-    transformers \
     huggingface_hub \
-    numpy \
-    scipy \
-    librosa \
-    soundfile \
     psutil \
     ebooklib \
     beautifulsoup4
@@ -35,47 +31,42 @@ RUN python3 -c "import nltk; nltk.download('punkt')"
 
 # --- Pre-install silentcipher with modified dependencies ---
 WORKDIR /opt
-# Clone silentcipher
 RUN git clone https://github.com/SesameAILabs/silentcipher.git
 WORKDIR /opt/silentcipher
-# Relax numpy and scipy requirements in silentcipher's setup files
 RUN sed -i "s/numpy>=[0-9.]*/numpy/" setup.py requirements.txt || true
 RUN sed -i "s/scipy>=[0-9.]*/scipy/" setup.py requirements.txt || true
-# Install the modified silentcipher globally
 RUN pip install .
-# --- End of silentcipher pre-installation ---
+# --- End silentcipher ---
 
-# Clone, prepare, and copy Sesame CSM source in one step
+# --- Install CSM dependencies and CSM itself ---
 WORKDIR /opt
-# Note: All commands run relative to /opt unless changed by cd
-RUN git clone https://github.com/SesameAILabs/csm.git && \
-    # --- Verification after clone ---
-    echo "--- Verifying /opt contents after clone ---" && \
-    ls -l /opt && \
-    echo "--- Verifying /opt/csm contents after clone ---" && \
-    ls -l /opt/csm && \
-    # --- End verification ---
-    # Modify files inside /opt/csm
-    cd csm && \
-    sed -i '/^transformers==/d' requirements.txt setup.py && \
-    sed -i '/^moshi==/d' requirements.txt setup.py && \
-    sed -i '/^torchtune==/d' requirements.txt setup.py && \
-    sed -i '/silentcipher @ git/d' setup.py && \
-    # Go back to /opt
-    cd .. && \
-    # Create target directory in site-packages
-    mkdir -p /usr/local/lib/python3.8/dist-packages/csm && \
-    # Copy Python files from /opt/csm into the target directory
-    cp /opt/csm/*.py /usr/local/lib/python3.8/dist-packages/csm/ && \
-    # Create an empty __init__.py to ensure it's treated as a package
-    touch /usr/local/lib/python3.8/dist-packages/csm/__init__.py && \
-    # Verify that the copy happened and list contents
-    echo "--- Verifying CSM copy in site-packages ---" && \
-    ls -l /usr/local/lib/python3.8/dist-packages/csm && \
-    echo "--- Verification complete ---"
+# Install mimi first
+RUN pip install git+https://github.com/SesameAILabs/mimi.git
+# Install other specific CSM dependencies (ignore versions for broader compatibility initially)
+RUN pip install einops rotary_embedding_torch vector_quantize_pytorch xformers accelerate
 
-# Download the model - REMOVED FROM DOCKERFILE
-# RUN python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
+# Clone CSM repo
+RUN git clone https://github.com/SesameAILabs/csm.git
+WORKDIR /opt/csm
+# Remove dependencies we installed manually or are in the base image from setup.py
+RUN sed -i '/^transformers/d' setup.py && \
+    sed -i '/^torch/d' setup.py && \
+    sed -i '/^torchaudio/d' setup.py && \
+    sed -i '/^numpy/d' setup.py && \
+    sed -i '/^scipy/d' setup.py && \
+    sed -i '/^librosa/d' setup.py && \
+    sed -i '/^soundfile/d' setup.py && \
+    sed -i '/^einops/d' setup.py && \
+    sed -i '/^rotary_embedding_torch/d' setup.py && \
+    sed -i '/^vector_quantize_pytorch/d' setup.py && \
+    sed -i '/^xformers/d' setup.py && \
+    sed -i '/^accelerate/d' setup.py && \
+    sed -i '/mimi @ git/d' setup.py && \
+    sed -i '/silentcipher @ git/d' setup.py
+
+# Install CSM in editable mode (adds /opt/csm to path implicitly for the build)
+RUN pip install -e .
+# --- End CSM ---
 
 # Create directories for mounting volumes
 RUN mkdir -p /audiobook_data /books /models

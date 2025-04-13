@@ -300,76 +300,70 @@ python generate_audiobook_sesame_epub.py \
 
 For a more streamlined experience, similar to the Piper TTS approach, you can use the included Docker container for Sesame CSM:
 
-**Important Pre-requisite: Download the Model Manually**
+**Important Pre-requisites:**
 
-The `sesame/csm-1b` model requires authentication. You need to download it manually on your host machine first.
-
-1.  **Install Hugging Face Hub CLI:**
+1.  **Download the Model Manually:**
+    The `sesame/csm-1b` model requires authentication. Download it manually on your host machine first.
     ```bash
+    # Install Hugging Face Hub CLI
     pip install -U huggingface_hub
-    ```
-2.  **Log in:**
-    ```bash
+    # Log in (requires Hugging Face account and token)
     huggingface-cli login
-    # Follow the prompts, you might need to create a token on huggingface.co
-    ```
-3.  **Download the model:** This will download the model files to a specific local directory.
-    ```bash
-    # Make sure the target directory exists
+    # Create target directory
     mkdir -p ~/huggingface_models
-    # Download, specifying the local directory and disabling symlinks for Docker compatibility
+    # Download model (disabling symlinks for Docker)
     huggingface-cli download sesame/csm-1b --local-dir ~/huggingface_models/sesame-csm-1b --local-dir-use-symlinks False
     ```
-    *Note: You may need to visit the model page on Hugging Face first (https://huggingface.co/sesame/csm-1b) and accept any terms or agreements.*
+    *Note: You may need to visit the model page (https://huggingface.co/sesame/csm-1b) and accept terms.*
+
+2.  **Llama 3.2 1B Access:**
+    The CSM model uses `meta-llama/Llama-3.2-1B` internally. Ensure you have requested access and been granted permission for this model on Hugging Face. Your `huggingface-cli login` should provide the necessary authentication when the script runs inside the container.
 
 Now you can proceed with building and running the container.
 
 ```bash
-# Option 1: Using the quickstart.sh script (recommended)
-# The quickstart script needs modification to handle the pre-downloaded model.
-# (Future improvement: Update quickstart.sh to detect/mount ~/huggingface_models/sesame-csm-1b)
-# For now, use Option 2 (Manual Docker) for Sesame.
-# ./quickstart.sh your_book.epub sesame
+# Option 1: Using the quickstart.sh script
+# (Future improvement: Update quickstart.sh for Sesame)
+# ./quickstart.sh your_book.epub sesame [voice_preset_name]
 
 # Option 2: Manual Docker approach
 # Check if sesame-tts image exists, build if not
 if ! docker image inspect sesame-tts &>/dev/null; then
     echo "Building Sesame TTS Docker container..."
     # Build using the modified Dockerfile (docker/sesame-tts/Dockerfile)
-    # NOTE: The Dockerfile has been significantly modified to handle dependency conflicts:
-    #   - Installs Rust/Cargo.
-    #   - Installs base Python dependencies.
-    #   - Clones 'silentcipher', modifies requirements, and installs it.
-    #   - Clones 'csm', removes pinned versions and silentcipher dependency.
-    #   - **Copies the 'csm' source code directly into site-packages instead of using pip install -e.**
-    #   - The model download step has been REMOVED from the Dockerfile.
+    # NOTE: The Dockerfile now installs dependencies (silentcipher, mimi, others)
+    # and then installs 'csm' itself in editable mode using 'pip install -e .'
+    # This relies on the dependencies being correctly installed first.
     sudo docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
 fi
 
-# Run the container with direct script execution, mounting the downloaded model
-# NOTE: No -e PYTHONPATH needed. Script no longer modifies sys.path.
+# Run the container with direct script execution
+# The script now uses generator.load_csm_1b() and generate()
+# The --voice_preset argument provides context audio
 docker run --runtime nvidia --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
   --volume ~/huggingface_models/sesame-csm-1b:/models/sesame-csm-1b \
+  --volume ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   --workdir /audiobook_data \
   sesame-tts python3 /books/generate_audiobook_sesame.py \
   --input /books/your_book.epub \
   --output /audiobook_data/audiobook_sesame.mp3 \
   --model_path /models/sesame-csm-1b \
-  --voice_preset "calm"
+  --voice_preset calm # Optional: Name of wav file in model_path/prompts
 
-# Alternatively, run the container in interactive mode, mounting the model
-# NOTE: No -e PYTHONPATH needed.
+# Alternatively, run the container in interactive mode
 docker run --runtime nvidia -it --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
   --volume ~/huggingface_models/sesame-csm-1b:/models/sesame-csm-1b \
+  --volume ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   --workdir /audiobook_data \
   sesame-tts
 ```
+*Note: We now mount the host's Hugging Face cache (`~/.cache/huggingface`) to `/root/.cache/huggingface` inside the container. This allows the container to use the host's login token and potentially cached Llama model files.*
 
-When using the interactive mode, you can then run commands inside the container, specifying the model path:
+When using the interactive mode, run the script inside:
 
 ```bash
 # Generate an audiobook using Sesame (inside container)
@@ -377,7 +371,7 @@ python3 /books/generate_audiobook_sesame.py \
   --input /books/your_book.epub \
   --output /audiobook_data/audiobook_sesame.mp3 \
   --model_path /models/sesame-csm-1b \
-  --voice_preset "calm"
+  --voice_preset calm # Optional
 ```
 
 ## 5. Voice Model Selection Guide
