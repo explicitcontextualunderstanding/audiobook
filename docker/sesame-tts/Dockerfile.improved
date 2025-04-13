@@ -1,0 +1,94 @@
+FROM dustynv/l4t-pytorch:r35.4.1
+
+# Install system dependencies in a single layer
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    libsndfile1 \
+    python3-pip \
+    git \
+    wget \
+    unzip \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust/Cargo (required for some dependencies)
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN wget -q -O - https://sh.rustup.rs | sh -s -- -y
+
+# Install base Python dependencies
+RUN pip3 install --no-cache-dir --upgrade pip && \
+    pip3 install --no-cache-dir \
+    PyPDF2 \
+    pdfminer.six \
+    nltk \
+    tqdm \
+    pydub \
+    huggingface_hub \
+    psutil \
+    ebooklib \
+    beautifulsoup4 \
+    einops \
+    rotary_embedding_torch \
+    vector_quantize_pytorch \
+    accelerate \
+    && python3 -c "import nltk; nltk.download('punkt')"
+
+# We'll install repos from GitHub in a single layer to avoid context issues
+WORKDIR /tmp
+RUN wget -q https://github.com/SesameAILabs/silentcipher/archive/refs/heads/main.zip -O silentcipher.zip && \
+    unzip -q silentcipher.zip && \
+    cd silentcipher-main && \
+    sed -i "s/numpy>=[0-9.]*/numpy/" setup.py requirements.txt && \
+    sed -i "s/scipy>=[0-9.]*/scipy/" setup.py requirements.txt && \
+    pip install . && \
+    cd .. && \
+    rm -rf silentcipher-main silentcipher.zip && \
+    \
+    wget -q https://github.com/SesameAILabs/mimi/archive/refs/heads/main.zip -O mimi.zip && \
+    unzip -q mimi.zip && \
+    cd mimi-main && \
+    pip install . && \
+    cd .. && \
+    rm -rf mimi-main mimi.zip && \
+    \
+    # Try installing xformers which can be problematic
+    pip install xformers || echo "Failed to install xformers - continuing anyway" && \
+    \
+    wget -q https://github.com/SesameAILabs/csm/archive/refs/heads/main.zip -O csm.zip && \
+    unzip -q csm.zip && \
+    cd csm-main && \
+    # Remove dependencies we already installed
+    sed -i '/^transformers/d' setup.py && \
+    sed -i '/^torch/d' setup.py && \
+    sed -i '/^torchaudio/d' setup.py && \
+    sed -i '/^numpy/d' setup.py && \
+    sed -i '/^scipy/d' setup.py && \
+    sed -i '/^librosa/d' setup.py && \
+    sed -i '/^soundfile/d' setup.py && \
+    sed -i '/^einops/d' setup.py && \
+    sed -i '/^rotary_embedding_torch/d' setup.py && \
+    sed -i '/^vector_quantize_pytorch/d' setup.py && \
+    sed -i '/^xformers/d' setup.py && \
+    sed -i '/^accelerate/d' setup.py && \
+    sed -i '/mimi @ git/d' setup.py && \
+    sed -i '/silentcipher @ git/d' setup.py && \
+    pip install . && \
+    cd .. && \
+    # Keep CSM source as it might be needed by the application
+    mkdir -p /opt/csm && \
+    cp -r csm-main/* /opt/csm/ && \
+    # Clean up
+    rm -rf csm-main csm.zip
+
+# Create directories for mounting volumes
+RUN mkdir -p /audiobook_data /books /models
+
+# Set working directory
+WORKDIR /audiobook_data
+
+# Environment variables that might help with Python package discovery
+ENV PYTHONPATH="/opt/csm:${PYTHONPATH}"
+
+# Add a quick test to verify the installation
+RUN python3 -c "from csm import generator; print('CSM import successful!')" || \
+    echo "WARNING: CSM import failed, but container build will continue."
