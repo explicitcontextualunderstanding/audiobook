@@ -309,30 +309,11 @@ For a more streamlined experience, similar to the Piper TTS approach, you can us
 if ! docker image inspect sesame-tts &>/dev/null; then
     echo "Building Sesame TTS Docker container..."
     
-    # You can either use the included Dockerfile
-    cd ~/audiobook
-    docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
-    
-    # Or create a temporary Dockerfile as the quickstart script does
-    TEMP_DIR=$(mktemp -d)
-    cat > $TEMP_DIR/Dockerfile <<EOL
-FROM nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
-
-RUN pip install PyPDF2 nltk tqdm pydub ebooklib beautifulsoup4 psutil transformers huggingface_hub numpy scipy librosa soundfile torch
-
-# Clone and install CSM
-RUN git clone https://github.com/SesameAILabs/csm.git && \
-    cd csm && \
-    pip install -e .
-
-# Download the model
-RUN python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
-
-WORKDIR /audiobook_data
-EOL
-    
-    docker build -t sesame-tts $TEMP_DIR
-    rm -rf $TEMP_DIR
+    # Build using the included Dockerfile
+    # Navigate to your audiobook project directory first if you aren't already there
+    # cd ~/audiobook 
+    # This build is generally less memory-intensive than the Piper build
+    sudo docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
 fi
 
 # Run the container with direct script execution
