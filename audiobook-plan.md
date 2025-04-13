@@ -96,8 +96,6 @@ echo "This is a test of the Piper text to speech system." > test.txt
 cat test.txt | piper -m /opt/piper/etc/test_voice.onnx -f /audiobook_data/test.wav
 
 # Install ffmpeg and convert to MP3 format
-apt-get update && apt-get install -y ffmpeg
-ffmpeg -i /audiobook_data/test.wav -y -codec:a libmp3lame -qscale:a 2 /audiobook_data/test.mp3
 ```
 
 ### 2.4 Install Required Python Packages in the Container
@@ -391,221 +389,93 @@ For extra safety, you can backup your generated chapters before making changes:
 rsync -a ~/audiobook_data/audiobook_chapters_piper/ ~/audiobook_data/audiobook_chapters_piper_bak/
 ```
 
-## 7. Troubleshooting
+### Monitoring the Build Process
 
-If you encounter issues with the audiobook generation:
-
-1. **Memory Issues**: If the Jetson runs out of memory, try processing the book in smaller chunks using the `--chapter_range` option
-2. **Container Errors**: Make sure the volume mounts are specified correctly and come BEFORE the container name
-3. **Model Loading**: Verify that the voice model path is correct
-4. **Missing Dependencies**: Run `pip install -r requirements.txt` to install all needed packages
-5. **CUDA Problems**: Ensure your Jetson has the latest JetPack/L4T version installed
-
-### 7.1 Piper Container Build Failures
-
-If you encounter errors like the following when building the piper-tts container:
-
-```
-[ 94%] Building CUDA object CMakeFiles/onnxruntime_providers_cuda.dir/opt/onnxruntime/onnxruntime/contrib_ops/cuda/bert/flash_attention/flash_fwd_hdim192_fp16_sm80.cu.o
-Killed
-gmake[2]: *** [CMakeFiles/onnxruntime_providers_cuda.dir/build.make:6203: CMakeFiles/onnxruntime_providers_cuda.dir/opt/onnxruntime/onnxruntime/contrib_ops/cuda/bert/flash_attention/flash_fwd_hdim128_bf16_sm80.cu.o] Error 137
-```
-
-This indicates that the system ran out of memory during the ONNX Runtime compilation. Try these solutions:
-
-1. **Increase Swap Space**:
-   ```bash
-   # Check current swap
-   free -h
-   
-   # Create a 8GB swap file
-   sudo fallocate -l 8G /var/swapfile
-   sudo chmod 600 /var/swapfile
-   sudo mkswap /var/swapfile
-   sudo swapon /var/swapfile
-   
-   # Verify swap is active
-   free -h
-   
-   # Make swap permanent (add to /etc/fstab)
-   echo '/var/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
-   ```
-
-2. **Try Pre-built Container**:
-   ```bash
-   # The 'pull' command is not available in jetson-containers
-   # Instead, use the build command which will download pre-built layers when available
-   ./jetson-containers build piper-tts
-   
-   # If build fails, try with reduced parallelism after increasing swap
-   ./jetson-containers build --make-flags="-j2" piper-tts
-   ```
-
-   Note: After increasing swap (e.g., to 11GB total as shown by `free -h`), you should retry the build. With your current 11GB swap configuration, there's a good chance the build will succeed. If it still fails, try the build with reduced parallelism using the --make-flags="-j2" option.
-   
-   ```bash
-   # First attempt with normal parallelism
-   ./jetson-containers build piper-tts
-   
-   # If that fails, try with reduced parallel jobs
-   ./jetson-containers build --make-flags="-j2" piper-tts
-   ```
-
-3. **Reduce Compilation Resources**:
-   ```bash
-   # Modify /home/username/jetson-containers/packages/ml/onnxruntime/build.sh
-   # Find the cmake command line and add:
-   # -DONNX_USE_REDUCED_OPERATOR_TYPE_SET=1
-   ```
-
-4. **Use Sesame Approach**: If the Piper container build consistently fails, consider using the Sesame CSM approach instead which is already packaged as a Docker container in this project.
-
-### 7.2 Completing the Build Despite ONNX Runtime Errors
-
-If you're experiencing the ONNX Runtime build failure shown above, here's a step-by-step approach to complete your audiobook project:
-
-#### Option 1: Create a Larger Swap Space and Retry
-
+**Monitoring from Another Terminal:** While the build is running in Terminal 1, you can monitor its progress from a second terminal by "tailing" the log file:
 ```bash
-# Create a larger 16GB swap file (if the 8GB wasn't enough)
-sudo swapoff /var/swapfile  # Turn off existing swap if present
-sudo rm /var/swapfile       # Remove existing swap file
-sudo fallocate -l 16G /var/swapfile
-sudo chmod 600 /var/swapfile
-sudo mkswap /var/swapfile
-sudo swapon /var/swapfile
-
-# Verify the new swap size
-free -h
-
-# Now retry building the container with less parallelism
-cd ~/jetson-containers
-./jetson-containers build --make-flags="-j2" piper-tts
+# On the Jetson host (Terminal 2)
+tail -f ~/jetson-containers/build_log.txt 
 ```
+Press `Ctrl+C` in Terminal 2 to stop monitoring.
 
-The `-j2` flag reduces the number of parallel compilation jobs, which reduces memory usage.
-
-#### Option 2: Modify Build Parameters to Reduce Memory Usage
-
-Create a custom build script that reduces the ONNX Runtime build's memory requirements:
-
+**Alternative Monitoring (If Logs Weren't Redirected):** If you didn't redirect the build output, you can use system tools in Terminal 2 to see if the build is still active:
 ```bash
-# Create a directory for your custom build
-mkdir -p ~/custom_build
-cd ~/custom_build
+# Install monitoring tools (if not already installed)
+sudo apt update
+sudo apt install -y htop iotop
 
-# Create a modified build script
-cat > build_piper_minimal.sh << 'EOF'
-#!/bin/bash
-set -e
+# Check CPU/Memory usage (look for docker, buildkitd, make, cc1plus, nvcc, etc.)
+htop 
+# (Press 'q' to quit)
 
-# Clone jetson-containers if not already done
-if [ ! -d ~/jetson-containers ]; then
-  git clone https://github.com/dusty-nv/jetson-containers ~/jetson-containers
-fi
+# Check Disk I/O
+sudo iotop
+# (Press 'q' to quit)
 
-cd ~/jetson-containers
-
-# Modify the ONNX Runtime build parameters temporarily
-ONNX_BUILD_FILE="packages/ml/onnxruntime/build.sh"
-cp $ONNX_BUILD_FILE ${ONNX_BUILD_FILE}.backup
-
-# Add reduced operator set and other memory-saving flags
-sed -i 's/cmake -G Ninja/cmake -G Ninja -DONNX_USE_REDUCED_OPERATOR_TYPE_SET=1 -DONNX_DISABLE_CONTRIB_OPS=1 -DONNX_DISABLE_RTTI=1/g' $ONNX_BUILD_FILE
-
-# Try building with less parallelism
-./jetson-containers build --make-flags="-j1" piper-tts
-
-# Restore the original build file
-mv ${ONNX_BUILD_FILE}.backup $ONNX_BUILD_FILE
-EOF
-
-# Make it executable
-chmod +x build_piper_minimal.sh
-
-# Run it
-./build_piper_minimal.sh
+# Check if the build was killed due to low memory (requires sudo)
+sudo dmesg | grep -i kill
 ```
+High CPU or disk activity suggests the build is still running. No activity might mean it's stalled or finished/failed. Output lines containing "oom-kill" or "Killed process" related to `docker` or build processes (like `cicc`, `cc1plus`, `nvcc`) strongly indicate the build failed due to running out of memory.
 
-#### Option 3: Skip Container Build and Use Sesame CSM (Recommended Workaround)
+Try these solutions if the build failed:
 
-Since the Sesame CSM approach is already working and provides good quality, you can switch to it instead:
+1.  **Increase Swap Space**: (Recommended first step if OOM errors occurred *and* current swap is small)
+    ```bash
+    # Check current swap size and total memory
+    # Look at the 'Swap:' line. If 'total' is 0 or very small (e.g., < 4Gi), you might need more swap.
+    free -h
+    # Example Output: Swap: 11Gi 309Mi 11Gi  <-- This shows 11Gi total swap already exists.
 
-```bash
-# Simply use the quickstart script with the sesame option
-./quickstart.sh your_book.epub sesame
-```
+    # Check available disk space on the root filesystem (where swap file is usually created)
+    # Look at the 'Avail' column for the '/' mount point. Ensure you have enough space 
+    # (e.g., > 8GB) if you decide to create a *new* or *larger* swap file.
+    df -h /
+    # Example Output: /dev/nvme0n1p1 115G 65G 46G 59% / <-- This shows 46G available.
 
-This will:
-1. Skip the problematic Piper build entirely
-2. Use the Sesame CSM container which builds more reliably
-3. Generate your audiobook with high quality output
+    # --- If your current swap is small (< 4Gi) AND you have disk space, create/increase it: ---
+    # Create a 8GB swap file (adjust size '8G' if needed and if space permits)
+    # sudo fallocate -l 8G /var/swapfile
+    # sudo chmod 600 /var/swapfile
+    # sudo mkswap /var/swapfile
+    # sudo swapon /var/swapfile
 
-#### Option 4: Create a Simplified Piper Container
+    # Verify swap is active (check 'Swap:' line again)
+    # free -h
 
-Instead of building the full ONNX Runtime with all optimizations, you can create a simplified container:
+    # Make swap permanent (add to /etc/fstab)
+    # CAUTION: Only do this if you created a new swap file successfully.
+    # Check if the line already exists before adding: grep -qxF '/var/swapfile swap swap defaults 0 0' /etc/fstab || echo '/var/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
+    # echo '/var/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
+    ```
+    After increasing swap, **reboot your Jetson** or ensure the swap is active after creating it, then try the build again.
+    **Note:** If `free -h` already shows significant swap (e.g., 8Gi or more), adding even more might not help, and you should proceed to Step 3.
 
-```bash
-# Create a directory for our custom Dockerfile
-mkdir -p ~/custom_piper
-cd ~/custom_piper
+2.  **Try Pre-built Container Layers**: (Usually automatic, but can be forced)
+    ```bash
+    # The build command automatically tries to pull pre-built layers
+    ./jetson-containers build piper-tts
+    ```
 
-# Create a simplified Dockerfile for Piper
-cat > Dockerfile << 'EOF'
-FROM nvcr.io/nvidia/l4t-pytorch:r35.2.1-pth2.0-py3
+3.  **Build with Reduced Parallelism**: (Recommended if OOM errors occurred even with sufficient swap)
+    If memory is still an issue even with swap, reduce the number of parallel build jobs. This significantly lowers peak memory usage during compilation.
+    ```bash
+    # On the Jetson host, navigate to the jetson-containers directory
+    cd ~/jetson-containers
 
-# Install basic dependencies
-RUN apt-get update && apt-get install -y \
-    build-essential \
-    cmake \
-    git \
-    python3-dev \
-    python3-pip \
-    ffmpeg \
-    libsndfile1 \
-    && rm -rf /var/lib/apt/lists/*
+    # Try building with only 2 parallel jobs
+    sudo ./jetson-containers build --make-flags="-j2" piper-tts
 
-# Install Python dependencies
-RUN pip3 install --no-cache-dir \
-    numpy \
-    soundfile \
-    PyPDF2 \
-    nltk \
-    tqdm \
-    pydub \
-    ebooklib \
-    beautifulsoup4 \
-    psutil
+    # If that still fails, try with only 1 job (slowest but uses least memory)
+    # sudo ./jetson-containers build --make-flags="-j1" piper-tts
+    ```
+    **Remember to capture logs** (`> build_log.txt 2>&1`) when trying these builds to analyze any further errors.
 
-# Clone Piper repository
-RUN git clone https://github.com/rhasspy/piper /opt/piper
+4.  **Reduce Compilation Resources**: (Advanced)
+    ```bash
+    # Modify /home/username/jetson-containers/packages/ml/onnxruntime/build.sh
+    # Find the cmake command line and add:
+    # -DONNX_USE_REDUCED_OPERATOR_TYPE_SET=1
+    # Then rebuild using reduced parallelism (Step 3).
+    ```
 
-# Download a few voice models
-RUN mkdir -p /opt/piper/voices/en && \
-    cd /opt/piper/voices/en && \
-    wget -q https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US-lessac-medium.onnx && \
-    wget -q https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US-lessac-medium.onnx.json
-
-# Set up directory structure
-WORKDIR /audiobook_data
-EOF
-
-# Build the simplified container
-docker build -t piper-tts-simple .
-
-# Run it with your book
-docker run --runtime nvidia -it --rm \
-  --volume ~/audiobook_data:/audiobook_data \
-  --volume ~/audiobook:/books \
-  --workdir /audiobook_data \
-  piper-tts-simple
-```
-
-Inside this container, you'll need to install the `onnxruntime` package separately and use a Python script that calls it directly rather than using the compiled C++ Piper executable:
-
-```bash
-# Inside the container
-pip install onnxruntime-gpu
-```
-
-Then create a simplified Python script at `/books/simple_piper_tts.py` that uses ONNX Runtime directly.
+5.  **Use Sesame Approach**: If the Piper container build consistently fails, consider using the Sesame CSM approach instead, which uses a pre-built container or a simpler build process described in section 4.4.
