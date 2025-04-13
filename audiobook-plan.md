@@ -409,93 +409,65 @@ For extra safety, you can backup your generated chapters before making changes:
 rsync -a ~/audiobook_data/audiobook_chapters_piper/ ~/audiobook_data/audiobook_chapters_piper_bak/
 ```
 
-### Monitoring the Build Process
+### Troubleshooting Disk Space Issues
 
-**Monitoring from Another Terminal:** While the build is running in Terminal 1, you can monitor its progress from a second terminal by "tailing" the log file:
-```bash
-# On the Jetson host (Terminal 2)
-tail -f ~/jetson-containers/build_log.txt 
-```
-Press `Ctrl+C` in Terminal 2 to stop monitoring.
+If you encounter "No space left on device" errors during `git pull`, Docker builds, or other operations, you need to free up disk space. A large drive (like 1TB NVMe) can still fill up, especially with Docker images, build caches, and large datasets.
 
-**Alternative Monitoring (If Logs Weren't Redirected):** If you didn't redirect the build output, you can use system tools in Terminal 2 to see if the build is still active:
-```bash
-# Install monitoring tools (if not already installed)
-sudo apt update
-sudo apt install -y htop iotop
-
-# Check CPU/Memory usage (look for docker, buildkitd, make, cc1plus, nvcc, etc.)
-htop 
-# (Press 'q' to quit)
-
-# Check Disk I/O
-sudo iotop
-# (Press 'q' to quit)
-
-# Check if the build was killed due to low memory (requires sudo)
-sudo dmesg | grep -i kill
-```
-High CPU or disk activity suggests the build is still running. No activity might mean it's stalled or finished/failed. Output lines containing "oom-kill" or "Killed process" related to `docker` or build processes (like `cicc`, `cc1plus`, `nvcc`) strongly indicate the build failed due to running out of memory.
-
-Try these solutions if the build failed:
-
-1.  **Increase Swap Space**: (Recommended first step if OOM errors occurred *and* current swap is small)
+1.  **Check Disk Usage:**
+    See how much space is used on your main storage device (usually mounted at `/`).
     ```bash
-    # Check current swap size and total memory
-    # Look at the 'Swap:' line. If 'total' is 0 or very small (e.g., < 4Gi), you might need more swap.
-    free -h
-    # Example Output: Swap: 11Gi 309Mi 11Gi  <-- This shows 11Gi total swap already exists.
-
-    # Check available disk space on the root filesystem (where swap file is usually created)
-    # Look at the 'Avail' column for the '/' mount point. Ensure you have enough space 
-    # (e.g., > 8GB) if you decide to create a *new* or *larger* swap file.
     df -h /
-    # Example Output: /dev/nvme0n1p1 115G 65G 46G 59% / <-- This shows 46G available.
-
-    # --- If your current swap is small (< 4Gi) AND you have disk space, create/increase it: ---
-    # Create a 8GB swap file (adjust size '8G' if needed and if space permits)
-    # sudo fallocate -l 8G /var/swapfile
-    # sudo chmod 600 /var/swapfile
-    # sudo mkswap /var/swapfile
-    # sudo swapon /var/swapfile
-
-    # Verify swap is active (check 'Swap:' line again)
-    # free -h
-
-    # Make swap permanent (add to /etc/fstab)
-    # CAUTION: Only do this if you created a new swap file successfully.
-    # Check if the line already exists before adding: grep -qxF '/var/swapfile swap swap defaults 0 0' /etc/fstab || echo '/var/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
-    # echo '/var/swapfile swap swap defaults 0 0' | sudo tee -a /etc/fstab
+    # Look at the 'Use%' column. If it's near 100%, you need to clean up.
     ```
-    After increasing swap, **reboot your Jetson** or ensure the swap is active after creating it, then try the build again.
-    **Note:** If `free -h` already shows significant swap (e.g., 8Gi or more), adding even more might not help, and you should proceed to Step 3.
-
-2.  **Try Pre-built Container Layers**: (Usually automatic, but can be forced)
+    Also check overall disk usage across all mounted filesystems:
     ```bash
-    # The build command automatically tries to pull pre-built layers
-    ./jetson-containers build piper-tts
+    df -h
     ```
 
-3.  **Build with Reduced Parallelism**: (Recommended if OOM errors occurred even with sufficient swap)
-    If memory is still an issue even with swap, reduce the number of parallel build jobs. This significantly lowers peak memory usage during compilation.
+2.  **Clean Docker Resources:** Docker build caches, images, containers, and volumes are often major consumers of space.
     ```bash
-    # On the Jetson host, navigate to the jetson-containers directory
-    cd ~/jetson-containers
-
-    # Try building with only 2 parallel jobs
-    sudo ./jetson-containers build --make-flags="-j2" piper-tts
-
-    # If that still fails, try with only 1 job (slowest but uses least memory)
-    # sudo ./jetson-containers build --make-flags="-j1" piper-tts
+    # Remove stopped containers
+    sudo docker container prune -f
+    # Remove unused networks
+    sudo docker network prune -f
+    # Remove unused images (dangling and unreferenced)
+    sudo docker image prune -a -f
+    # Remove build cache
+    sudo docker builder prune -f
+    # Remove unused volumes (Use with caution if you store persistent data in volumes)
+    sudo docker volume prune -f
+    # Comprehensive cleanup (Use with extreme caution - removes all unused resources)
+    # sudo docker system prune -a -f --volumes
     ```
-    **Remember to capture logs** (`> build_log.txt 2>&1`) when trying these builds to analyze any further errors.
 
-4.  **Reduce Compilation Resources**: (Advanced)
+3.  **Clean Apt Cache:** Remove downloaded package files (`.deb`).
     ```bash
-    # Modify /home/username/jetson-containers/packages/ml/onnxruntime/build.sh
-    # Find the cmake command line and add:
-    # -DONNX_USE_REDUCED_OPERATOR_TYPE_SET=1
-    # Then rebuild using reduced parallelism (Step 3).
+    sudo apt-get clean
+    # Remove packages that were automatically installed to satisfy dependencies
+    # for other packages and are now no longer needed.
+    sudo apt-get autoremove -y
     ```
 
-5.  **Use Sesame Approach**: If the Piper container build consistently fails, consider using the Sesame CSM approach instead, which uses a pre-built container or a simpler build process described in section 4.4.
+4.  **Check Large Directories/Files:** Find large files or directories in your home folder or common data locations.
+    ```bash
+    # Check size of key directories (adjust paths as needed)
+    du -sh ~/.cache/huggingface
+    du -sh ~/audiobook_data
+    du -sh ~/jetson-containers/data # If using jetson-containers
+    du -sh ~/Downloads
+    du -sh ~/.local/share/Trash # Check the trash folder
+    du -sh /var/log # Check system log files size
+
+    # Find top 10 largest files/dirs in your home directory (can take time)
+    du -a ~ | sort -n -r | head -n 10
+
+    # Optional: Install and use ncdu for interactive analysis
+    # sudo apt install ncdu
+    # ncdu ~  # Analyze home directory
+    # ncdu /  # Analyze root filesystem (requires sudo)
+    ```
+    Delete files or directories you no longer need. Be careful not to delete essential system files. Empty the trash if applicable. Rotate or clear large log files in `/var/log` if necessary (advanced).
+
+5.  **Reboot (Optional):** Sometimes a reboot can clear temporary files held by running processes.
+
+After freeing up space using these methods, check `df -h /` again. If usage is well below 100% (e.g., < 90%), you should be able to retry the operation that failed (e.g., `git pull`, `docker build`).
