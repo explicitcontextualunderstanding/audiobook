@@ -1,12 +1,13 @@
 FROM dustynv/l4t-pytorch:r35.4.1
 
-# Install system dependencies including curl for rustup
+# Install system dependencies including curl, git (still needed for pip?), and unzip
 RUN apt-get update && apt-get install -y \
     ffmpeg \
     libsndfile1 \
     python3-pip \
     git \
     curl \
+    unzip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,30 +32,43 @@ RUN python3 -c "import nltk; nltk.download('punkt')"
 
 # --- Pre-install silentcipher with modified dependencies ---
 WORKDIR /opt
-# Clone silentcipher using HTTP and disable terminal prompt
-RUN GIT_TERMINAL_PROMPT=0 git clone http://github.com/SesameAILabs/silentcipher.git
+# Download and unzip silentcipher
+RUN curl -L -o silentcipher.zip https://github.com/SesameAILabs/silentcipher/archive/refs/heads/main.zip && \
+    unzip silentcipher.zip && \
+    rm silentcipher.zip && \
+    # Rename extracted folder (usually repo-branch)
+    mv silentcipher-main silentcipher
+
 WORKDIR /opt/silentcipher
 # Relax numpy and scipy requirements in silentcipher's setup files
 RUN sed -i "s/numpy>=[0-9.]*/numpy/" setup.py requirements.txt || true
 RUN sed -i "s/scipy>=[0-9.]*/scipy/" setup.py requirements.txt || true
-# Install the modified silentcipher globally
 RUN pip install .
 # --- End silentcipher ---
 
 # --- Install CSM dependencies and CSM itself ---
 WORKDIR /opt
-# Clone and install mimi locally using HTTP and disable terminal prompt
-RUN GIT_TERMINAL_PROMPT=0 git clone http://github.com/SesameAILabs/mimi.git && \
+# Download, unzip, and install mimi locally
+RUN curl -L -o mimi.zip https://github.com/SesameAILabs/mimi/archive/refs/heads/main.zip && \
+    unzip mimi.zip && \
+    rm mimi.zip && \
+    # Rename extracted folder
+    mv mimi-main mimi && \
     cd mimi && \
     pip install . && \
     cd .. && \
-    rm -rf mimi # Clean up cloned repo after install
+    rm -rf mimi # Clean up extracted repo after install
 
-# Install other specific CSM dependencies (ignore versions for broader compatibility initially)
+# Install other specific CSM dependencies
 RUN pip install einops rotary_embedding_torch vector_quantize_pytorch xformers accelerate
 
-# Clone CSM repo using HTTP and disable terminal prompt
-RUN GIT_TERMINAL_PROMPT=0 git clone http://github.com/SesameAILabs/csm.git
+# Download and unzip CSM repo
+RUN curl -L -o csm.zip https://github.com/SesameAILabs/csm/archive/refs/heads/main.zip && \
+    unzip csm.zip && \
+    rm csm.zip && \
+    # Rename extracted folder
+    mv csm-main csm
+
 WORKDIR /opt/csm
 # Remove dependencies we installed manually or are in the base image from setup.py
 RUN sed -i '/^transformers/d' setup.py && \
