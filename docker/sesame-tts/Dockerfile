@@ -44,6 +44,13 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pdfminer.six \
     nltk
 
+# Add the PyTorch upgrade here:
+# Upgrade to newer PyTorch for Jetson
+RUN pip3 uninstall -y torch torchvision torchaudio && \
+    wget https://developer.download.nvidia.com/compute/redist/jp/v511/pytorch/torch-2.2.0a0+81ea7a4-cp38-cp38-linux_aarch64.whl && \
+    pip3 install torch-2.2.0a0+81ea7a4-cp38-cp38-linux_aarch64.whl && \
+    rm torch-2.2.0a0+81ea7a4-cp38-cp38-linux_aarch64.whl
+
 # Install CSM additional dependencies (with fallbacks for packages that might fail)
 RUN pip3 install --no-cache-dir einops || echo "Warning: Failed to install einops" && \
     pip3 install --no-cache-dir rotary_embedding_torch || echo "Warning: Failed to install rotary_embedding_torch" && \
