@@ -136,32 +136,8 @@ except Exception as e:\n\
     sys.exit(1)\n\
 ' > /usr/local/bin/utils/test_csm.py && chmod +x /usr/local/bin/utils/test_csm.py
 
-# Create the entrypoint script using separate RUN commands for each line
-RUN echo '#!/bin/bash' > /usr/local/bin/entrypoint.sh
-RUN echo '' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "=================================================="' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "Sesame CSM Audiobook Generator for Jetson"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "=================================================="' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo ""' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "Available commands:"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo ""' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "  • Test CSM installation:"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "    python /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo ""' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "  • Generate audiobook:"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "    python /books/generate_audiobook_sesame.py \\"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "      --input /books/your_book.epub \\"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "      --output /audiobook_data/audiobook.mp3 \\"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "      --model_path /models/sesame-csm-1b"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo ""' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "Volume mounts:"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "  • /models/sesame-csm-1b: Model files"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "  • /books: Source books"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "  • /audiobook_data: Output directory"' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo ""' >> /usr/local/bin/entrypoint.sh
-RUN echo 'echo "=================================================="' >> /usr/local/bin/entrypoint.sh
-RUN echo '' >> /usr/local/bin/entrypoint.sh
-RUN echo 'exec "$@"' >> /usr/local/bin/entrypoint.sh
+# Copy the entrypoint script
+COPY docker/sesame-tts/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Set working directory
