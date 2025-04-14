@@ -373,7 +373,8 @@ When using the interactive mode, you can first test the installation and then ru
 ```bash
 # Test CSM installation (inside container)
 # This script verifies model loading and performs a basic generation.
-python /usr/local/bin/test_csm.py /models/sesame-csm-1b
+# Use python3 explicitly to ensure f-string compatibility
+python3 /usr/local/bin/test_csm.py /models/sesame-csm-1b
 
 # Generate an audiobook using Sesame (inside container)
 python3 /books/generate_audiobook_sesame.py \
