@@ -1,4 +1,6 @@
-FROM dustynv/l4t-pytorch:r35.4.1
+FROM dustynv/l4t-pytorch:r36.4.0-cu128-24.04
+
+# This is a base image for JetPack 6.x (L4T r36.x) with Ubuntu 24.04
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -47,9 +49,14 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
 # Add the PyTorch upgrade here:
 # Upgrade to newer PyTorch for Jetson
 RUN pip3 uninstall -y torch torchvision torchaudio && \
-    wget https://developer.download.nvidia.com/compute/redist/jp/v511/pytorch/torch-2.2.0a0+81ea7a4-cp38-cp38-linux_aarch64.whl && \
-    pip3 install torch-2.2.0a0+81ea7a4-cp38-cp38-linux_aarch64.whl && \
-    rm torch-2.2.0a0+81ea7a4-cp38-cp38-linux_aarch64.whl
+    wget https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl && \
+    pip3 install torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl && \
+    rm torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl
+
+# Alternative approach: Use the jetson-containers project
+# See: https://github.com/dusty-nv/jetson-containers
+# Build with: jetson-containers build pytorch:2.6
+# Run with: jetson-containers run dustynv/pytorch:2.6-r36.4.0-cu128-24.04
 
 # Install CSM additional dependencies (with fallbacks for packages that might fail)
 RUN pip3 install --no-cache-dir einops || echo "Warning: Failed to install einops" && \
@@ -79,7 +86,9 @@ __all__ = ["load_csm_1b", "Segment", "Generator"]\n\
 ' > /opt/csm/__init__.py
 
 # Add CSM to Python path directly instead of installing it
-RUN echo 'import sys; sys.path.append("/opt/csm")' > /usr/local/lib/python3.8/dist-packages/csm_path.pth
+RUN python3 -c "import sys; import distutils.sysconfig; path=distutils.sysconfig.get_python_lib(); print(path)" > /tmp/python_path && \
+    echo 'import sys; sys.path.append("/opt/csm")' > $(cat /tmp/python_path)/csm_path.pth && \
+    rm /tmp/python_path
 
 # Download NLTK data
 RUN python3 -c "import nltk; nltk.download('punkt')"
