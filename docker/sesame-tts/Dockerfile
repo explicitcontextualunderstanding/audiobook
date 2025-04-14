@@ -55,6 +55,11 @@ RUN pip3 install --no-cache-dir silentcipher || \
     pip3 install --no-cache-dir git+https://github.com/SesameAILabs/silentcipher.git@master || \
     echo "Warning: Failed to install silentcipher. Some watermarking features might not work."
 
+# Add after the other pip install commands
+RUN pip3 install --no-cache-dir torchtune || \
+    pip3 install --no-cache-dir git+https://github.com/SesameAILabs/torchtune.git || \
+    echo "Warning: Failed to install torchtune. Some models might not work."
+
 # Download essential CSM files instead of cloning the full repository
 WORKDIR /opt/csm
 RUN wget -q https://raw.githubusercontent.com/SesameAILabs/csm/main/generator.py && \
