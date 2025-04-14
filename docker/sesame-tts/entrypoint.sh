@@ -10,10 +10,7 @@ echo "  • Test CSM installation:"
 echo "    python /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b"
 echo ""
 echo "  • Generate audiobook:"
-echo "    python /books/generate_audiobook_sesame.py \
-      --input /books/your_book.epub \
-      --output /audiobook_data/audiobook.mp3 \
-      --model_path /models/sesame-csm-1b"
+echo "    python /books/generate_audiobook_sesame.py --input /books/your_book.epub --output /audiobook_data/audiobook.mp3 --model_path /models/sesame-csm-1b"
 echo ""
 echo "Volume mounts:"
 echo "  • /models/sesame-csm-1b: Model files"
