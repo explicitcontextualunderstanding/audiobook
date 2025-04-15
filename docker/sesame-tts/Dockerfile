@@ -58,8 +58,7 @@ RUN python3 -c "import torchaudio; print(f'✓ Torchaudio version found in base:
 
 # Upgrade pip and install core dependencies
 # NOTE: PyTorch is provided by the base image. Torchaudio might be.
-# Install moshi and triton as they are required by CSM/runtime.
-# torchao is NOT included in this base image and not installed.
+# Install moshi, triton, and torchao as they are required by CSM/torchtune/runtime.
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pip3 install --no-cache-dir \
     tokenizers \
@@ -75,16 +74,19 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     PyPDF2 \
     pdfminer.six \
     nltk \
-    # Install moshi and triton (runtime dependencies)
+    # Install runtime dependencies: moshi, triton
     moshi \
     triton \
+    # Install torchao (required by torchtune, which is required by CSM)
+    torchao==0.11.0 \
     # Attempt to install torchaudio==2.6.0 only if not found in base
     && (python3 -c "import torchaudio" || pip3 install --no-cache-dir torchaudio==2.6.0 || echo "⚠️ Warning: Failed to install torchaudio==2.6.0") \
     && echo "✓ Core Python dependencies installed" \
     # Verify imports and check versions
     && python3 -c "import torch; print(f'✓ PyTorch version: {torch.__version__}')" \
     && python3 -c "import torch; print(f'✓ PyTorch CUDA version: {torch.version.cuda}')" \
-    # torchao is not expected here
+    # Verify torchao installation
+    && python3 -c "import torchao; print(f'✓ torchao version: {torchao.__version__}')" \
     && python3 -c "import transformers; print(f'✓ Transformers version: {transformers.__version__}')" \
     # Verify torchaudio import again after potential install
     && (python3 -c "import torchaudio; print(f'✓ Torchaudio version: {torchaudio.__version__}')" || echo "⚠️ Warning: Torchaudio import failed after install attempt") \
@@ -156,9 +158,9 @@ RUN chmod +x /usr/local/bin/entrypoint.sh && \
 WORKDIR ${AUDIOBOOK_DATA}
 
 # Add health check to ensure container is functioning properly
-# Remove torchao check, keep others
+# Add torchao back to the check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD python3 -c "import torch, torchaudio, csm, moshi, triton; print('Health check passed.')" || exit 1
+    CMD python3 -c "import torch, torchaudio, torchao, csm, moshi, triton; print('Health check passed.')" || exit 1
 
 # Print build completion message
 RUN echo "✓ Sesame-TTS container build completed successfully!"

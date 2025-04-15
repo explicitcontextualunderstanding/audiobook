@@ -11,7 +11,7 @@ logger = logging.getLogger("test_csm")
 try:
     import torch
     import torchaudio
-    # import torchao # No longer needed/present in the environment
+    import torchao # Re-enable import
     
     # Try multiple import paths for flexibility
     try:

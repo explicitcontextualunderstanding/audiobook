@@ -335,13 +335,20 @@ pip install --extra-index-url https://pypi.jetsonhacks.com/ torch
 The Dockerfile (`docker/sesame-tts/Dockerfile`) uses the following approach:
 
 1.  **Base Image:** Uses `dustynv/pytorch:2.6-r36.4.0-cu128-24.04`.
-    *   This image provides PyTorch 2.6 and CUDA 12.8, built for JetPack 6.1+ (L4T r36.4.0) on Ubuntu 24.04.
-    *   It **does not** include `torchao` by default, which avoids the dependency conflicts encountered previously. (The official `nvcr.io/nvidia/l4t-pytorch` image for this configuration was not found at the time of writing).
-2.  **Runtime Dependencies:** Installs `moshi` and `triton` via `pip`. These were found to be necessary for CSM to run correctly in this environment.
-3.  **Other Dependencies:** Installs `torchaudio` (if needed), `transformers`, `torchtune`, and other Python packages required for audiobook generation using the Jetson PyPI index.
-4.  **CSM Code:** Downloads the necessary `generator.py` and `models.py` files from the SesameAILabs repository and adds them to the Python path, avoiding the need to clone the entire repository.
+    *   Provides PyTorch 2.6 and CUDA 12.8 for JetPack 6.1+.
+    *   Does **not** include `torchao` by default.
+2.  **Dependency Chain:** Runtime testing revealed the following dependency chain:
+    *   CSM (`models.py`) requires `torchtune`.
+    *   `torchtune` requires `torchao`.
+    *   CSM also requires `moshi` and `triton`.
+    *   Therefore, `torch`, `torchtune`, `torchao`, `moshi`, and `triton` are all necessary.
+3.  **Installation Strategy:**
+    *   Installs `moshi`, `triton`, and `torchao==0.11.0` explicitly via `pip` using the Jetson PyPI index. This ensures all required components are present.
+    *   Installs `torchaudio` (if needed), `transformers`, `torchtune`, and other Python packages.
+    *   Includes build-time checks to verify successful import of `torch`, `torchao`, `moshi`, and `triton`.
+4.  **CSM Code:** Downloads the necessary `generator.py` and `models.py` files and adds them to the Python path.
 
-This strategy aims for a clean environment by starting with a base containing the correct PyTorch version and explicitly installing only the necessary runtime dependencies for CSM.
+This strategy attempts to resolve previous conflicts by starting with a cleaner base image and explicitly installing all known required dependencies (`torchao`, `triton`, `moshi`) from the Jetson PyPI index. Potential build-time conflicts between these specific versions are checked during the build.
 
 Now you can proceed with building and running the container.
 
@@ -356,7 +363,7 @@ Now you can proceed with building and running the container.
 if ! sudo docker image inspect sesame-tts-jetson &>/dev/null; then
     echo "Building Sesame TTS Docker container for Jetson..."
     # Build using the modified Dockerfile (docker/sesame-tts/Dockerfile)
-    # NOTE: Uses dustynv/pytorch base, installs moshi/triton via pip.
+    # NOTE: Uses dustynv/pytorch base, installs torchao/moshi/triton via pip.
     sudo docker build -t sesame-tts-jetson -f docker/sesame-tts/Dockerfile .
 fi
 
@@ -398,9 +405,10 @@ When using the interactive mode, you can first test the installation and then ru
 # Use python3 explicitly
 python3 /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b
 # Note: If you encounter an error like:
-# ModuleNotFoundError: No module named 'moshi' or 'triton'
+# ModuleNotFoundError: No module named 'moshi', 'triton', or 'torchao'
 # This indicates the dependency failed to install correctly. Check build logs.
-# Errors related to 'torchao' should no longer occur with this base image strategy.
+# Build-time import errors related to conflicts between these packages
+# should ideally be caught during the 'docker build' step.
 
 # Generate an audiobook using Sesame (inside container)
 # Use python3 explicitly
