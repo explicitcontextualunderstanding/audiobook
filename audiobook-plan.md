@@ -383,11 +383,19 @@ When using the interactive mode, you can first test the installation and then ru
 # Use python3 explicitly
 python3 /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b
 # Note: If you encounter an error like:
+# ImportError: torchao not installed...
+# or
+# ModuleNotFoundError: No module named 'torchao'
+# This means the torchao installation likely failed during the Docker build.
+# The Dockerfile has been modified to install build dependencies (cmake, ninja-build)
+# and build torchao v0.2.0 directly from source. It will explicitly fail the build
+# if torchao cannot be installed correctly. Check the Docker build logs for
+# specific errors during the torchao build step (cloning repo, running pip install .).
+#
+# If you previously saw an error like:
 # AttributeError: type object 'torch._C.Tag' has no attribute 'needs_fixed_stride_order'
-# This indicates an incompatibility between the installed torchao/torchtune versions
-# and the PyTorch version in the base image. The Dockerfile attempts to mitigate
-# this by pinning torchao to version v0.2.0. If the error persists, further
-# adjustments to dependency versions in the Dockerfile might be needed.
+# This indicated an incompatibility between newer torchao/torchtune versions
+# and the base image's PyTorch. The Dockerfile pins torchao to v0.2.0 to mitigate this.
 
 # Generate an audiobook using Sesame (inside container)
 # Use python3 explicitly

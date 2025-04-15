@@ -31,6 +31,14 @@ RUN apt-get update && apt-get install -y \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && echo "✓ Rust installed: $(rustc --version)"
 
+# Install build dependencies needed for torchao/torchtune
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    cmake \
+    ninja-build \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* \
+    && echo "✓ Build dependencies installed"
+
 # Create necessary directories
 RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} \
     && echo "✓ Directories created"
@@ -73,15 +81,21 @@ RUN pip3 install --no-cache-dir silentcipher && \
     echo "✓ Installed silentcipher from GitHub") || \
     echo "Warning: Failed to install silentcipher. Some watermarking features might not work."
 
-# Install torchao and torchtune from GitHub
-# Pin torchao to v0.2.0 due to potential incompatibility with base image PyTorch
-# (AttributeError: type object 'torch._C.Tag' has no attribute 'needs_fixed_stride_order')
-RUN (pip3 install --no-cache-dir git+https://github.com/pytorch/torchao.git@v0.2.0 && \
-    echo "✓ Installed torchao v0.2.0 from GitHub") || \
-    echo "Warning: Failed to install torchao." && \
-    (pip3 install --no-cache-dir git+https://github.com/pytorch/torchtune.git && \
-    echo "✓ Installed torchtune from GitHub") || \
-    echo "Warning: Failed to install torchtune. Some models might not work."
+# Install torchao from GitHub source (pinned version v0.2.0)
+# Requires cmake, ninja-build installed previously.
+# Fail build if this step fails to ensure torchtune dependency is met.
+RUN git clone https://github.com/pytorch/torchao.git /tmp/torchao && \
+    cd /tmp/torchao && \
+    git checkout v0.2.0 && \
+    pip3 install --no-cache-dir . && \
+    cd / && \
+    rm -rf /tmp/torchao && \
+    echo "✓ Installed torchao v0.2.0 from source"
+
+# Install torchtune from GitHub
+# Fail build if this step fails
+RUN pip3 install --no-cache-dir git+https://github.com/pytorch/torchtune.git && \
+    echo "✓ Installed torchtune from GitHub"
 
 # Download essential CSM files instead of cloning the full repository
 WORKDIR /opt/csm
