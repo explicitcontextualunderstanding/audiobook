@@ -72,10 +72,8 @@ RUN pip3 install --no-cache-dir silentcipher && \
     echo "✓ Installed silentcipher from GitHub") || \
     echo "Warning: Failed to install silentcipher. Some watermarking features might not work."
 
-# Install torchtune (will attempt to install torchao dependency)
-RUN pip3 install --no-cache-dir torchtune && \
-    echo "✓ Installed torchtune from PyPI: $(pip show torchtune | grep Version)" || \
-    (pip3 install --no-cache-dir git+https://github.com/pytorch/torchtune.git && \
+# Install torchtune (Force install from GitHub)
+RUN (pip3 install --no-cache-dir git+https://github.com/pytorch/torchtune.git && \
     echo "✓ Installed torchtune from GitHub") || \
     echo "Warning: Failed to install torchtune. Some models might not work."
 
