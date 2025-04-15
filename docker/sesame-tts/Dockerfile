@@ -1,7 +1,9 @@
-ARG BASE_IMAGE=dustynv/l4t-pytorch:r36.2.0
+# Use the official torchao image for JetPack 6.1+ (L4T r36.4.0)
+# Includes PyTorch 2.6, CUDA 12.8, torchao 0.11.0
+ARG BASE_IMAGE=dustynv/torchao:0.11.0-r36.4.0-cu128-24.04
 FROM ${BASE_IMAGE}
 
-# This is a base image for JetPack 6.x (L4T r36.x) with Ubuntu 24.04
+# This image is based on JetPack 6.1+ (L4T r36.4.x) with Ubuntu 24.04
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
@@ -14,38 +16,29 @@ ENV PYTHONUNBUFFERED=1 \
     AUDIOBOOK_DATA=/audiobook_data \
     BOOKS_DIR=/books
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
+# Install system dependencies (git, wget, curl, unzip already in base)
+# Add ffmpeg, libsndfile1, python3-pip
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
     python3-pip \
-    git \
-    wget \
-    curl \
-    unzip \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && echo "✓ System dependencies installed"
 
 # Install Rust/Cargo (needed for some Python dependencies)
+# Rust/Cargo might already be in the base, but installing ensures it's present
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && echo "✓ Rust installed: $(rustc --version)"
 
-# Install build dependencies needed for torchao/torchtune
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    cmake \
-    ninja-build \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
-    && echo "✓ Build dependencies installed"
+# Build dependencies (cmake, ninja-build) are no longer needed for torchao
 
 # Create necessary directories
 RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} \
     && echo "✓ Directories created"
 
 # Upgrade pip and install core dependencies
-# NOTE: PyTorch and Torchaudio are provided by the dustynv/l4t-pytorch base image.
-# We do not reinstall them here to ensure compatibility with the Jetson platform.
+# NOTE: PyTorch, Torchaudio, and torchao are provided by the base image.
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pip3 install --no-cache-dir \
     tokenizers \
@@ -62,6 +55,9 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pdfminer.six \
     nltk \
     && echo "✓ Core Python dependencies installed" \
+    && python3 -c "import torch; print(f'✓ PyTorch version: {torch.__version__}')" \
+    && python3 -c "import torchaudio; print(f'✓ Torchaudio version: {torchaudio.__version__}')" \
+    && python3 -c "import torchao; print(f'✓ torchao version: {torchao.__version__}')" \
     && python3 -c "import transformers; print(f'✓ Transformers version: {transformers.__version__}')"
 
 # Install CSM additional dependencies (with fallbacks for packages that might fail)
@@ -77,29 +73,21 @@ RUN pip3 install --no-cache-dir einops && \
 # Install silentcipher (trying PyPI first, then GitHub)
 RUN pip3 install --no-cache-dir silentcipher && \
     echo "✓ Installed silentcipher from PyPI: $(pip show silentcipher | grep Version)" || \
-    (pip3 install --no-cache-dir git+https://github.com/SesameAILabs/silentcipher.git@master && \
+    (export GIT_TERMINAL_PROMPT=0 && pip3 install --no-cache-dir git+https://github.com/SesameAILabs/silentcipher.git@master && \
     echo "✓ Installed silentcipher from GitHub") || \
     echo "Warning: Failed to install silentcipher. Some watermarking features might not work."
 
-# Install torchao from GitHub source (pinned version v0.2.0)
-# Requires cmake, ninja-build installed previously.
-# Fail build if this step fails to ensure torchtune dependency is met.
-# Use git:// protocol instead of https:// to avoid potential auth issues.
-RUN export GIT_TERMINAL_PROMPT=0 && \
-    git clone git://github.com/pytorch/torchao.git /tmp/torchao && \
-    cd /tmp/torchao && \
-    git checkout v0.2.0 && \
-    pip3 install --no-cache-dir . && \
-    cd / && \
-    rm -rf /tmp/torchao && \
-    echo "✓ Installed torchao v0.2.0 from source"
+# torchao is included in the base image - no manual installation needed
 
-# Install torchtune from GitHub
+# Install torchtune (try PyPI first, then GitHub)
 # Fail build if this step fails
-# Use git:// protocol instead of https:// to avoid potential auth issues.
-RUN export GIT_TERMINAL_PROMPT=0 && \
-    pip3 install --no-cache-dir git+git://github.com/pytorch/torchtune.git && \
-    echo "✓ Installed torchtune from GitHub"
+RUN (pip3 install --no-cache-dir torchtune && \
+     echo "✓ Installed torchtune from PyPI: $(pip show torchtune | grep Version)") || \
+    (export GIT_TERMINAL_PROMPT=0 && \
+     pip3 install --no-cache-dir git+https://github.com/pytorch/torchtune.git && \
+     echo "✓ Installed torchtune from GitHub") || \
+    (echo "ERROR: Failed to install torchtune from both PyPI and GitHub." && exit 1)
+
 
 # Download essential CSM files instead of cloning the full repository
 WORKDIR /opt/csm
@@ -114,7 +102,7 @@ __all__ = ["load_csm_1b", "Segment", "Generator"]\n\
 ' > /opt/csm/__init__.py
 
 # Add CSM to Python path directly instead of installing it
-RUN python3 -c "import sys; import distutils.sysconfig; path=distutils.sysconfig.get_python_lib(); print(path)" > /tmp/python_path && \
+RUN python3 -c "import sys; import site; print(site.getsitepackages()[0])" > /tmp/python_path && \
     echo 'import sys; sys.path.append("/opt/csm")' > $(cat /tmp/python_path)/csm_path.pth && \
     rm /tmp/python_path && \
     echo "✓ CSM added to Python path"
@@ -140,6 +128,7 @@ logger = logging.getLogger("test_csm")\n\
 try:\n\
     import torch\n\
     import torchaudio\n\
+    import torchao # Verify torchao import\n\
     # Try multiple import paths for flexibility\n\
     try:\n\
         from csm import load_csm_1b, Segment\n\
