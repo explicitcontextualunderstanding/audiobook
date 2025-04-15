@@ -1,6 +1,6 @@
-# Use the official L4T PyTorch image for JetPack 6.1+ (L4T r36.4.0)
+# Use the dustynv PyTorch image for JetPack 6.1+ (L4T r36.4.0)
 # Includes PyTorch 2.6, CUDA 12.8. Does NOT include torchao by default.
-ARG BASE_IMAGE=nvcr.io/nvidia/l4t-pytorch:r36.4.0-pth2.6-py3
+ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
 FROM ${BASE_IMAGE}
 
 # Add container metadata
@@ -59,7 +59,7 @@ RUN python3 -c "import torchaudio; print(f'✓ Torchaudio version found in base:
 # Upgrade pip and install core dependencies
 # NOTE: PyTorch is provided by the base image. Torchaudio might be.
 # Install moshi and triton as they are required by CSM/runtime.
-# torchao is NOT included in this base image and not installed, resolving the previous conflict.
+# torchao is NOT included in this base image and not installed.
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pip3 install --no-cache-dir \
     tokenizers \
@@ -91,7 +91,6 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     # Verify moshi and triton imports
     && (python3 -c "import moshi; print('✓ Moshi imported successfully')" || echo "⚠️ Warning: Moshi import failed") \
     && (python3 -c "import triton; print('✓ Triton imported successfully')" || echo "⚠️ Warning: Triton import failed")
-
 
 # Install CSM additional dependencies (with fallbacks for packages that might fail)
 RUN pip3 install --no-cache-dir einops && \

@@ -334,14 +334,14 @@ pip install --extra-index-url https://pypi.jetsonhacks.com/ torch
 
 The Dockerfile (`docker/sesame-tts/Dockerfile`) uses the following approach:
 
-1.  **Base Image:** Uses `nvcr.io/nvidia/l4t-pytorch:r36.4.0-pth2.6-py3`.
-    *   This is the standard NVIDIA base image for JetPack 6.1+ providing PyTorch 2.6 and CUDA 12.8.
-    *   Crucially, it **does not** include `torchao` by default, which avoids dependency conflicts encountered with other base images.
+1.  **Base Image:** Uses `dustynv/pytorch:2.6-r36.4.0-cu128-24.04`.
+    *   This image provides PyTorch 2.6 and CUDA 12.8, built for JetPack 6.1+ (L4T r36.4.0) on Ubuntu 24.04.
+    *   It **does not** include `torchao` by default, which avoids the dependency conflicts encountered previously. (The official `nvcr.io/nvidia/l4t-pytorch` image for this configuration was not found at the time of writing).
 2.  **Runtime Dependencies:** Installs `moshi` and `triton` via `pip`. These were found to be necessary for CSM to run correctly in this environment.
 3.  **Other Dependencies:** Installs `torchaudio` (if needed), `transformers`, `torchtune`, and other Python packages required for audiobook generation using the Jetson PyPI index.
 4.  **CSM Code:** Downloads the necessary `generator.py` and `models.py` files from the SesameAILabs repository and adds them to the Python path, avoiding the need to clone the entire repository.
 
-This strategy aims for a clean environment by starting with a standard base and explicitly installing only the necessary dependencies, resolving previous conflicts related to pre-packaged libraries in alternative base images.
+This strategy aims for a clean environment by starting with a base containing the correct PyTorch version and explicitly installing only the necessary runtime dependencies for CSM.
 
 Now you can proceed with building and running the container.
 
@@ -356,7 +356,7 @@ Now you can proceed with building and running the container.
 if ! sudo docker image inspect sesame-tts-jetson &>/dev/null; then
     echo "Building Sesame TTS Docker container for Jetson..."
     # Build using the modified Dockerfile (docker/sesame-tts/Dockerfile)
-    # NOTE: Uses l4t-pytorch base, installs moshi/triton via pip.
+    # NOTE: Uses dustynv/pytorch base, installs moshi/triton via pip.
     sudo docker build -t sesame-tts-jetson -f docker/sesame-tts/Dockerfile .
 fi
 
