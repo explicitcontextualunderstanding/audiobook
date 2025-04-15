@@ -382,6 +382,12 @@ When using the interactive mode, you can first test the installation and then ru
 # This script verifies model loading and performs a basic generation.
 # Use python3 explicitly
 python3 /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b
+# Note: If you encounter an error like:
+# AttributeError: type object 'torch._C.Tag' has no attribute 'needs_fixed_stride_order'
+# This indicates an incompatibility between the installed torchao/torchtune versions
+# and the PyTorch version in the base image. The Dockerfile attempts to mitigate
+# this by pinning torchao to version v0.2.0. If the error persists, further
+# adjustments to dependency versions in the Dockerfile might be needed.
 
 # Generate an audiobook using Sesame (inside container)
 # Use python3 explicitly
