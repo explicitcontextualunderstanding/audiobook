@@ -327,30 +327,34 @@ Now you can proceed with building and running the container.
 # ./quickstart.sh your_book.epub sesame [voice_preset_name]
 
 # Option 2: Manual Docker approach
-# Check if sesame-tts image exists, build if not
-if ! docker image inspect sesame-tts &>/dev/null; then
-    echo "Building Sesame TTS Docker container..."
+# Check if sesame-tts-jetson image exists, build if not
+# Use a distinct tag like 'sesame-tts-jetson' to avoid conflicts
+if ! sudo docker image inspect sesame-tts-jetson &>/dev/null; then
+    echo "Building Sesame TTS Docker container for Jetson..."
     # Build using the modified Dockerfile (docker/sesame-tts/Dockerfile)
-    # NOTE: The Dockerfile now uses a more robust strategy:
-    #   - Installs dependencies with pinned versions and fallbacks.
-    #   - Downloads specific CSM source files (generator.py, models.py, setup.py) using wget.
-    #   - Installs silentcipher from PyPI with a git fallback.
-    #   - Creates a minimal CSM package structure and installs it.
+    # NOTE: The Dockerfile now uses the following strategy:
+    #   - Uses the dustynv/l4t-pytorch:r36.2.0 base image.
+    #   - Relies on the PyTorch and Torchaudio versions provided by the base image (No reinstallation).
+    #   - Installs other dependencies (transformers, CSM deps, etc.) via pip.
+    #   - Downloads specific CSM source files (generator.py, models.py).
+    #   - Installs silentcipher and torchtune with fallbacks.
+    #   - Creates a minimal CSM package structure and adds it to the Python path.
     #   - Includes a test script and a helpful entrypoint.
-    sudo docker build -t sesame-tts -f docker/sesame-tts/Dockerfile .
+    sudo docker build -t sesame-tts-jetson -f docker/sesame-tts/Dockerfile .
 fi
 
 # Run the container with direct script execution
 # The script now uses generator.load_csm_1b() and generate()
 # The --voice_preset argument provides context audio
 # Note: The entrypoint script will run first, displaying usage info.
-docker run --runtime nvidia --rm \
+# Use the 'sesame-tts-jetson' tag
+sudo docker run --runtime nvidia --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
   --volume ~/huggingface_models/sesame-csm-1b:/models/sesame-csm-1b \
   --volume ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   --workdir /audiobook_data \
-  sesame-tts python3 /books/generate_audiobook_sesame.py \
+  sesame-tts-jetson python3 /books/generate_audiobook_sesame.py \
   --input /books/your_book.epub \
   --output /audiobook_data/audiobook_sesame.mp3 \
   --model_path /models/sesame-csm-1b \
@@ -358,25 +362,27 @@ docker run --runtime nvidia --rm \
 
 # Alternatively, run the container in interactive mode
 # The entrypoint script will display usage info, then drop you into a bash shell.
-docker run --runtime nvidia -it --rm \
+# Use the 'sesame-tts-jetson' tag
+sudo docker run --runtime nvidia -it --rm \
   --volume ~/audiobook_data:/audiobook_data \
   --volume ~/audiobook:/books \
   --volume ~/huggingface_models/sesame-csm-1b:/models/sesame-csm-1b \
   --volume ${HOME}/.cache/huggingface:/root/.cache/huggingface \
   --workdir /audiobook_data \
-  sesame-tts
+  sesame-tts-jetson
 ```
-*Note: We now mount the host's Hugging Face cache (`~/.cache/huggingface`) to `/root/.cache/huggingface` inside the container. This allows the container to use the host's login token and potentially cached Llama model files.*
+*Note: We mount the host's Hugging Face cache (`~/.cache/huggingface`) to `/root/.cache/huggingface` inside the container. This allows the container to use the host's login token and potentially cached Llama model files.*
 
 When using the interactive mode, you can first test the installation and then run the generation script:
 
 ```bash
 # Test CSM installation (inside container)
 # This script verifies model loading and performs a basic generation.
-# Use python3 explicitly to ensure f-string compatibility
-python3 /usr/local/bin/test_csm.py /models/sesame-csm-1b
+# Use python3 explicitly
+python3 /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b
 
 # Generate an audiobook using Sesame (inside container)
+# Use python3 explicitly
 python3 /books/generate_audiobook_sesame.py \
   --input /books/your_book.epub \
   --output /audiobook_data/audiobook_sesame.mp3 \
