@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=dustynv/l4t-pytorch:r36.2
+ARG BASE_IMAGE=dustynv/l4t-pytorch:r36.2.0
 FROM ${BASE_IMAGE}
 
 # This is a base image for JetPack 6.x (L4T r36.x) with Ubuntu 24.04
