@@ -36,7 +36,8 @@ RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} \
     && echo "✓ Directories created"
 
 # Upgrade pip and install core dependencies
-# We use the base image's PyTorch installation instead of reinstalling
+# NOTE: PyTorch and Torchaudio are provided by the dustynv/l4t-pytorch base image.
+# We do not reinstall them here to ensure compatibility with the Jetson platform.
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pip3 install --no-cache-dir \
     tokenizers \
