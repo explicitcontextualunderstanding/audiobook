@@ -3,6 +3,12 @@
 ARG BASE_IMAGE=dustynv/torchao:0.11.0-r36.4.0-cu128-24.04
 FROM ${BASE_IMAGE}
 
+# Add container metadata
+LABEL org.opencontainers.image.description="Sesame CSM text-to-speech for Jetson"
+LABEL org.opencontainers.image.source="https://github.com/SesameAILabs/csm"
+LABEL com.nvidia.jetpack.version="6.1"
+LABEL com.nvidia.cuda.version="12.8"
+
 # This image is based on JetPack 6.1+ (L4T r36.4.x) with Ubuntu 24.04
 
 # Set environment variables
@@ -14,7 +20,11 @@ ENV PYTHONUNBUFFERED=1 \
     DEBIAN_FRONTEND=noninteractive \
     MODELS_DIR=/models \
     AUDIOBOOK_DATA=/audiobook_data \
-    BOOKS_DIR=/books
+    BOOKS_DIR=/books \
+    NVIDIA_VISIBLE_DEVICES=all \
+    NVIDIA_DRIVER_CAPABILITIES=all \
+    # Explicitly set the pip index URL to use the Jetson pip server
+    PIP_INDEX_URL=https://pypi.jetson-ai-lab.dev/jp6/cu128
 
 # Install system dependencies (git, wget, curl, unzip already in base)
 # Add ffmpeg, libsndfile1, python3-pip
@@ -38,7 +48,7 @@ RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} \
     && echo "✓ Directories created"
 
 # Upgrade pip and install core dependencies
-# NOTE: PyTorch, Torchaudio, and torchao are provided by the base image.
+# NOTE: PyTorch and torchao are provided by the base image, but torchaudio is not
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pip3 install --no-cache-dir \
     tokenizers \
@@ -54,7 +64,10 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     PyPDF2 \
     pdfminer.six \
     nltk \
+    # Install torchaudio explicitly - will use the custom pip server
+    torchaudio \
     && echo "✓ Core Python dependencies installed" \
+    # Verify imports and check versions
     && python3 -c "import torch; print(f'✓ PyTorch version: {torch.__version__}')" \
     && python3 -c "import torchaudio; print(f'✓ Torchaudio version: {torchaudio.__version__}')" \
     && python3 -c "import torchao; print(f'✓ torchao version: {torchao.__version__}')" \
@@ -189,6 +202,10 @@ RUN chmod +x /usr/local/bin/entrypoint.sh && \
 
 # Set working directory
 WORKDIR ${AUDIOBOOK_DATA}
+
+# Add health check to ensure container is functioning properly
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+    CMD python3 -c "import torch, torchaudio, torchao, csm; print('Health check passed.')" || exit 1
 
 # Print build completion message
 RUN echo "✓ Sesame-TTS container build completed successfully!"
