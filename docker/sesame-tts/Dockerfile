@@ -76,7 +76,7 @@ RUN pip3 install --no-cache-dir silentcipher && \
 # Install torchao and torchtune from GitHub
 # Pin torchao to v0.2.0 due to potential incompatibility with base image PyTorch
 # (AttributeError: type object 'torch._C.Tag' has no attribute 'needs_fixed_stride_order')
-RUN (pip3 install --no-cache-dir git+https://github.com/pytorch/ao.git@v0.2.0 && \
+RUN (pip3 install --no-cache-dir git+https://github.com/pytorch/torchao.git@v0.2.0 && \
     echo "✓ Installed torchao v0.2.0 from GitHub") || \
     echo "Warning: Failed to install torchao." && \
     (pip3 install --no-cache-dir git+https://github.com/pytorch/torchtune.git && \
