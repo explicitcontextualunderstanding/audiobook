@@ -337,7 +337,7 @@ if ! sudo docker image inspect sesame-tts-jetson &>/dev/null; then
     #   - Relies on the PyTorch and Torchaudio versions provided by the base image (No reinstallation).
     #   - Installs other dependencies (transformers, CSM deps, etc.) via pip.
     #   - Downloads specific CSM source files (generator.py, models.py).
-    #   - Installs torchao (dependency for torchtune) from GitHub.
+    #   - Installs torchao==0.1.0 (dependency for torchtune) from PyPI for compatibility.
     #   - Installs silentcipher and torchtune with fallbacks.
     #   - Creates a minimal CSM package structure and adds it to the Python path.
     #   - Includes a test script and a helpful entrypoint.

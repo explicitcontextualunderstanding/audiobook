@@ -72,10 +72,10 @@ RUN pip3 install --no-cache-dir silentcipher && \
     echo "✓ Installed silentcipher from GitHub") || \
     echo "Warning: Failed to install silentcipher. Some watermarking features might not work."
 
-# Install torchao (dependency for torchtune)
-RUN pip3 install --no-cache-dir git+https://github.com/pytorch/ao.git && \
-    echo "✓ Installed torchao from GitHub: $(pip show torchao | grep Version)" || \
-    echo "Warning: Failed to install torchao. Torchtune might not work correctly."
+# Install torchao (dependency for torchtune) - Pin to a potentially compatible version
+RUN pip3 install --no-cache-dir torchao==0.1.0 && \
+    echo "✓ Installed torchao==0.1.0 from PyPI: $(pip show torchao | grep Version)" || \
+    echo "Warning: Failed to install torchao 0.1.0. Torchtune might not work correctly."
 
 # Install torchtune
 RUN pip3 install --no-cache-dir torchtune && \
