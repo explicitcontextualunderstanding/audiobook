@@ -9,7 +9,7 @@ The plan supports both ePub and PDF formats, with ePub being the recommended for
 ## 1. Setup and Environment Preparation
 
 ### 1.1 System Requirements
-- Jetson Orin Nano with JetPack/L4T
+- Jetson Orin Nano with **JetPack 6.1 or newer (L4T r36.4.0+)**
 - At least 5GB of available RAM
 - At least 20GB of free storage space
 - Internet connection for downloading models
@@ -302,7 +302,8 @@ For a more streamlined experience, similar to the Piper TTS approach, you can us
 
 **Important Pre-requisites:**
 
-1.  **Download the Model Manually:**
+1.  **JetPack Version:** Ensure your Jetson device is running **JetPack 6.1 or newer (L4T r36.4.0+)**. The Docker container now uses a base image (`dustynv/torchao:0.11.0-r36.4.0-cu128-24.04`) built specifically for this environment.
+2.  **Download the Model Manually:**
     The `sesame/csm-1b` model requires authentication. Download it manually on your host machine first.
     ```bash
     # Install Hugging Face Hub CLI
@@ -316,7 +317,7 @@ For a more streamlined experience, similar to the Piper TTS approach, you can us
     ```
     *Note: You may need to visit the model page (https://huggingface.co/sesame/csm-1b) and accept terms.*
 
-2.  **Llama 3.2 1B Access:**
+3.  **Llama 3.2 1B Access:**
     The CSM model uses `meta-llama/Llama-3.2-1B` internally. Ensure you have requested access and been granted permission for this model on Hugging Face. Your `huggingface-cli login` should provide the necessary authentication when the script runs inside the container.
 
 Now you can proceed with building and running the container.
@@ -333,13 +334,11 @@ if ! sudo docker image inspect sesame-tts-jetson &>/dev/null; then
     echo "Building Sesame TTS Docker container for Jetson..."
     # Build using the modified Dockerfile (docker/sesame-tts/Dockerfile)
     # NOTE: The Dockerfile now uses the following strategy:
-    #   - Uses the dustynv/l4t-pytorch:r36.2.0 base image.
-    #   - Relies on the PyTorch and Torchaudio versions provided by the base image (No reinstallation).
+    #   - Uses the dustynv/torchao:0.11.0-r36.4.0-cu128-24.04 base image (Requires JetPack 6.1+ / L4T r36.4.0+).
+    #   - Relies on PyTorch 2.6, CUDA 12.8, Torchaudio, and torchao 0.11.0 provided by the base image.
     #   - Installs other dependencies (transformers, CSM deps, etc.) via pip.
+    #   - Installs torchtune (trying PyPI first).
     #   - Downloads specific CSM source files (generator.py, models.py).
-    #   - Installs torchao from GitHub.
-    #   - Installs silentcipher with fallback.
-    #   - Installs torchtune from GitHub.
     #   - Creates a minimal CSM package structure and adds it to the Python path.
     #   - Includes a test script and a helpful entrypoint.
     sudo docker build -t sesame-tts-jetson -f docker/sesame-tts/Dockerfile .
@@ -386,22 +385,16 @@ python3 /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b
 # ImportError: torchao not installed...
 # or
 # ModuleNotFoundError: No module named 'torchao'
-# This means the torchao installation likely failed during the Docker build.
-# The Dockerfile has been modified to install build dependencies (cmake, ninja-build)
-# and build torchao v0.2.0 directly from source, setting GIT_TERMINAL_PROMPT=0
-# during git operations. It will explicitly fail the build if torchao cannot be
-# installed correctly. Check the Docker build logs for specific errors during
-# the torchao build step.
+# This indicates an issue with the base Docker image (dustynv/torchao:...)
+# or a conflict during the installation of other packages. Verify you are
+# running JetPack 6.1+ (L4T r36.4.0+) as required by the base image.
+# Check the Docker build logs for errors during the 'pip3 install' steps,
+# especially for 'torchtune'.
 #
-# Compatibility Note: An official torchao container exists (dustynv/torchao:0.11.0-r36.4.0...)
-# but it targets L4T r36.4.0 (JetPack 6.1+) and is incompatible with our L4T r36.2.0
-# base image due to CUDA version differences. Therefore, we build torchao v0.2.0
-# from source within our environment.
-#
-# If you previously saw an error like:
-# AttributeError: type object 'torch._C.Tag' has no attribute 'needs_fixed_stride_order'
-# This indicated an incompatibility between newer torchao/torchtune versions
-# and the base image's PyTorch. The Dockerfile pins torchao to v0.2.0 to mitigate this.
+# The Dockerfile no longer builds torchao manually; it relies on the version
+# provided in the base image (torchao 0.11.0). Compatibility issues related
+# to older torchao versions (like v0.2.0) or missing attributes
+# (like 'needs_fixed_stride_order') should be resolved by using this updated base image.
 
 # Generate an audiobook using Sesame (inside container)
 # Use python3 explicitly
