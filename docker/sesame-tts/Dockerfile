@@ -1,6 +1,6 @@
-# Use the official torchao image for JetPack 6.1+ (L4T r36.4.0)
-# Includes PyTorch 2.6, CUDA 12.8, torchao 0.11.0
-ARG BASE_IMAGE=dustynv/torchao:0.11.0-r36.4.0-cu128-24.04
+# Use the official L4T PyTorch image for JetPack 6.1+ (L4T r36.4.0)
+# Includes PyTorch 2.6, CUDA 12.8. Does NOT include torchao by default.
+ARG BASE_IMAGE=nvcr.io/nvidia/l4t-pytorch:r36.4.0-pth2.6-py3
 FROM ${BASE_IMAGE}
 
 # Add container metadata
@@ -24,6 +24,8 @@ ENV PYTHONUNBUFFERED=1 \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=all \
     # Explicitly set the pip index URL to use the Jetson pip server
+    # This provides pre-built wheels optimized for Jetson, speeding up builds
+    # and avoiding potential compilation issues for complex packages.
     PIP_INDEX_URL=https://pypi.jetson-ai-lab.dev/jp6/cu128
 
 # Install system dependencies (git, wget, curl, unzip already in base)
@@ -46,8 +48,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
     && echo "✓ Rust installed: $(rustc --version)"
 
-# Build dependencies (cmake, ninja-build) are no longer needed for torchao
-
 # Create necessary directories
 RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} \
     && echo "✓ Directories created"
@@ -57,8 +57,9 @@ RUN python3 -c "import torchaudio; print(f'✓ Torchaudio version found in base:
     echo "✓ Torchaudio not found in base image, will attempt install."
 
 # Upgrade pip and install core dependencies
-# NOTE: PyTorch and torchao are provided by the base image. Torchaudio might be.
-# Rely on base image for triton if needed by torchao. Remove moshi.
+# NOTE: PyTorch is provided by the base image. Torchaudio might be.
+# Install moshi and triton as they are required by CSM/runtime.
+# torchao is NOT included in this base image and not installed, resolving the previous conflict.
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pip3 install --no-cache-dir \
     tokenizers \
@@ -76,14 +77,21 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     nltk \
     # Attempt to install torchaudio==2.6.0 only if not found in base
     && (python3 -c "import torchaudio" || pip3 install --no-cache-dir torchaudio==2.6.0 || echo "⚠️ Warning: Failed to install torchaudio==2.6.0") \
+    # Install moshi and triton (runtime dependencies)
+    moshi \
+    triton \
     && echo "✓ Core Python dependencies installed" \
     # Verify imports and check versions
     && python3 -c "import torch; print(f'✓ PyTorch version: {torch.__version__}')" \
     && python3 -c "import torch; print(f'✓ PyTorch CUDA version: {torch.version.cuda}')" \
-    && python3 -c "import torchao; print(f'✓ torchao version: {torchao.__version__}')" \
+    # torchao is not expected here
     && python3 -c "import transformers; print(f'✓ Transformers version: {transformers.__version__}')" \
     # Verify torchaudio import again after potential install
-    && (python3 -c "import torchaudio; print(f'✓ Torchaudio version: {torchaudio.__version__}')" || echo "⚠️ Warning: Torchaudio import failed after install attempt")
+    && (python3 -c "import torchaudio; print(f'✓ Torchaudio version: {torchaudio.__version__}')" || echo "⚠️ Warning: Torchaudio import failed after install attempt") \
+    # Verify moshi and triton imports
+    && (python3 -c "import moshi; print('✓ Moshi imported successfully')" || echo "⚠️ Warning: Moshi import failed") \
+    && (python3 -c "import triton; print('✓ Triton imported successfully')" || echo "⚠️ Warning: Triton import failed")
+
 
 # Install CSM additional dependencies (with fallbacks for packages that might fail)
 RUN pip3 install --no-cache-dir einops && \
@@ -94,12 +102,6 @@ RUN pip3 install --no-cache-dir einops && \
     echo "✓ Installed vector_quantize_pytorch: $(pip show vector_quantize_pytorch | grep Version)" || echo "Warning: Failed to install vector_quantize_pytorch" && \
     pip3 install --no-cache-dir datasets && \
     echo "✓ Installed datasets: $(pip show datasets | grep Version)" || echo "Warning: Failed to install datasets"
-
-# Remove the redundant torchaudio installation block below
-# RUN pip3 install --no-cache-dir torchaudio==2.6.0 && \
-#    ... (removed) ...
-
-# torchao is included in the base image - no manual installation needed
 
 # Install torchtune (try PyPI first, then GitHub)
 # Fail build if this step fails
@@ -155,9 +157,9 @@ RUN chmod +x /usr/local/bin/entrypoint.sh && \
 WORKDIR ${AUDIOBOOK_DATA}
 
 # Add health check to ensure container is functioning properly
-# Remove moshi and triton checks
+# Remove torchao check, keep others
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD python3 -c "import torch, torchaudio, torchao, csm; print('Health check passed.')" || exit 1
+    CMD python3 -c "import torch, torchaudio, csm, moshi, triton; print('Health check passed.')" || exit 1
 
 # Print build completion message
 RUN echo "✓ Sesame-TTS container build completed successfully!"
