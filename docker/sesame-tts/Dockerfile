@@ -61,7 +61,10 @@ RUN pip3 uninstall -y torch torchvision torchaudio && \
     wget https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl && \
     pip3 install torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl && \
     rm torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl && \
-    echo "✓ PyTorch upgraded: $(pip show torch | grep Version)"
+    echo "✓ PyTorch upgraded: $(pip show torch | grep Version)" && \
+    # Install compatible torchaudio
+    pip3 install --no-cache-dir torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cu121 && \
+    echo "✓ Torchaudio installed: $(pip show torchaudio | grep Version)"
 
 # Install CSM additional dependencies (with fallbacks for packages that might fail)
 RUN pip3 install --no-cache-dir einops && \
@@ -156,7 +159,7 @@ try:\n\
     \n\
     # Generate test audio\n\
     text = "This is a test of the CSM text to speech system."\n\
-    logger.info(f"Generating speech for: \"{text}\"")\n\
+    logger.info(f"Generating speech for: \\"{text}\\"")\n\
     audio = generator.generate(text=text)\n\
     \n\
     # Save the audio\n\
