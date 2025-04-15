@@ -55,17 +55,6 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     && echo "✓ Core Python dependencies installed" \
     && python3 -c "import transformers; print(f'✓ Transformers version: {transformers.__version__}')"
 
-# Add the PyTorch upgrade here:
-# Upgrade to newer PyTorch for Jetson
-RUN pip3 uninstall -y torch torchvision torchaudio && \
-    wget https://developer.download.nvidia.com/compute/redist/jp/v61/pytorch/torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl && \
-    pip3 install torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl && \
-    rm torch-2.5.0a0+872d972e41.nv24.08.17622132-cp310-cp310-linux_aarch64.whl && \
-    echo "✓ PyTorch upgraded: $(pip show torch | grep Version)" && \
-    # Install compatible torchaudio
-    pip3 install --no-cache-dir torchaudio --extra-index-url https://download.pytorch.org/whl/nightly/cu121 && \
-    echo "✓ Torchaudio installed: $(pip show torchaudio | grep Version)"
-
 # Install CSM additional dependencies (with fallbacks for packages that might fail)
 RUN pip3 install --no-cache-dir einops && \
     echo "✓ Installed einops: $(pip show einops | grep Version)" || echo "Warning: Failed to install einops" && \
