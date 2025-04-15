@@ -388,9 +388,15 @@ python3 /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b
 # ModuleNotFoundError: No module named 'torchao'
 # This means the torchao installation likely failed during the Docker build.
 # The Dockerfile has been modified to install build dependencies (cmake, ninja-build)
-# and build torchao v0.2.0 directly from source. It will explicitly fail the build
-# if torchao cannot be installed correctly. Check the Docker build logs for
-# specific errors during the torchao build step (cloning repo, running pip install .).
+# and build torchao v0.2.0 directly from source, setting GIT_TERMINAL_PROMPT=0
+# during git operations. It will explicitly fail the build if torchao cannot be
+# installed correctly. Check the Docker build logs for specific errors during
+# the torchao build step.
+#
+# Compatibility Note: An official torchao container exists (dustynv/torchao:0.11.0-r36.4.0...)
+# but it targets L4T r36.4.0 (JetPack 6.1+) and is incompatible with our L4T r36.2.0
+# base image due to CUDA version differences. Therefore, we build torchao v0.2.0
+# from source within our environment.
 #
 # If you previously saw an error like:
 # AttributeError: type object 'torch._C.Tag' has no attribute 'needs_fixed_stride_order'

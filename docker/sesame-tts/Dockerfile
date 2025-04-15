@@ -84,7 +84,9 @@ RUN pip3 install --no-cache-dir silentcipher && \
 # Install torchao from GitHub source (pinned version v0.2.0)
 # Requires cmake, ninja-build installed previously.
 # Fail build if this step fails to ensure torchtune dependency is met.
-RUN git clone https://github.com/pytorch/torchao.git /tmp/torchao && \
+# Set GIT_TERMINAL_PROMPT=0 to prevent git asking for credentials non-interactively.
+RUN export GIT_TERMINAL_PROMPT=0 && \
+    git clone https://github.com/pytorch/torchao.git /tmp/torchao && \
     cd /tmp/torchao && \
     git checkout v0.2.0 && \
     pip3 install --no-cache-dir . && \
@@ -94,7 +96,9 @@ RUN git clone https://github.com/pytorch/torchao.git /tmp/torchao && \
 
 # Install torchtune from GitHub
 # Fail build if this step fails
-RUN pip3 install --no-cache-dir git+https://github.com/pytorch/torchtune.git && \
+# Set GIT_TERMINAL_PROMPT=0 to prevent git asking for credentials non-interactively.
+RUN export GIT_TERMINAL_PROMPT=0 && \
+    pip3 install --no-cache-dir git+https://github.com/pytorch/torchtune.git && \
     echo "✓ Installed torchtune from GitHub"
 
 # Download essential CSM files instead of cloning the full repository
