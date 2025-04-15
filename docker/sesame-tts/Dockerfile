@@ -75,11 +75,11 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     PyPDF2 \
     pdfminer.six \
     nltk \
-    # Attempt to install torchaudio==2.6.0 only if not found in base
-    && (python3 -c "import torchaudio" || pip3 install --no-cache-dir torchaudio==2.6.0 || echo "⚠️ Warning: Failed to install torchaudio==2.6.0") \
     # Install moshi and triton (runtime dependencies)
     moshi \
     triton \
+    # Attempt to install torchaudio==2.6.0 only if not found in base
+    && (python3 -c "import torchaudio" || pip3 install --no-cache-dir torchaudio==2.6.0 || echo "⚠️ Warning: Failed to install torchaudio==2.6.0") \
     && echo "✓ Core Python dependencies installed" \
     # Verify imports and check versions
     && python3 -c "import torch; print(f'✓ PyTorch version: {torch.__version__}')" \
