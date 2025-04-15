@@ -445,19 +445,20 @@ If you encounter "No space left on device" errors during `git pull`, Docker buil
     ```bash
     df -h
     ```
+    **Note:** If `Use%` for `/` is very high (e.g., 95% or more, like the example 97%), cleanup is **urgent**. Docker builds and other operations will likely fail.
 
-2.  **Clean Docker Resources:** Docker build caches, images, containers, and volumes are often major consumers of space.
+2.  **Clean Docker Resources:** Docker build caches, images, containers, and volumes are often major consumers of space. **Prioritize these steps if disk space is critically low.**
     ```bash
     # Remove stopped containers
     sudo docker container prune -f
     # Remove unused networks
     sudo docker network prune -f
-    # Remove unused images (dangling and unreferenced)
+    # Remove unused images (dangling and unreferenced) - Often recovers significant space
     sudo docker image prune -a -f
-    # Remove build cache
+    # Remove build cache - Also often recovers significant space
     sudo docker builder prune -f
     # Remove unused volumes (Use with caution if you store persistent data in volumes)
-    sudo docker volume prune -f
+    # sudo docker volume prune -f
     # Comprehensive cleanup (Use with extreme caution - removes all unused resources)
     # sudo docker system prune -a -f --volumes
     ```
