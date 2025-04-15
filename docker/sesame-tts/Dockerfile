@@ -27,7 +27,7 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_INDEX_URL=https://pypi.jetson-ai-lab.dev/jp6/cu128
 
 # Install system dependencies (git, wget, curl, unzip already in base)
-# Add ffmpeg, libsndfile1, python3-pip, cmake, libopus-dev
+# Add ffmpeg, libsndfile1, python3-pip, cmake, libopus-dev, build-essential
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
@@ -35,6 +35,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Add cmake and libopus-dev for building dependencies like sphn (via audiopus_sys)
     cmake \
     libopus-dev \
+    # Add build-essential for packages needing compilation
+    build-essential \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && echo "✓ System dependencies installed"
@@ -50,8 +52,13 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
 RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} \
     && echo "✓ Directories created"
 
+# Check if torchaudio is already in the base image
+RUN python3 -c "import torchaudio; print(f'✓ Torchaudio version found in base: {torchaudio.__version__}')" || \
+    echo "✓ Torchaudio not found in base image, will attempt install."
+
 # Upgrade pip and install core dependencies
-# NOTE: PyTorch and torchao are provided by the base image, but torchaudio is not
+# NOTE: PyTorch and torchao are provided by the base image. Torchaudio might be.
+# Rely on base image for triton if needed by torchao. Remove moshi.
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pip3 install --no-cache-dir \
     tokenizers \
@@ -67,19 +74,16 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     PyPDF2 \
     pdfminer.six \
     nltk \
-    # Install torchaudio with a version that matches PyTorch 2.6.0
-    torchaudio==2.6.0 \
-    # Add moshi and triton
-    moshi \
-    triton \
+    # Attempt to install torchaudio==2.6.0 only if not found in base
+    && (python3 -c "import torchaudio" || pip3 install --no-cache-dir torchaudio==2.6.0 || echo "⚠️ Warning: Failed to install torchaudio==2.6.0") \
     && echo "✓ Core Python dependencies installed" \
     # Verify imports and check versions
     && python3 -c "import torch; print(f'✓ PyTorch version: {torch.__version__}')" \
     && python3 -c "import torch; print(f'✓ PyTorch CUDA version: {torch.version.cuda}')" \
     && python3 -c "import torchao; print(f'✓ torchao version: {torchao.__version__}')" \
     && python3 -c "import transformers; print(f'✓ Transformers version: {transformers.__version__}')" \
-    # Skip torchaudio verification during build to avoid halting if there are issues
-    && (python3 -c "import torchaudio; print(f'✓ Torchaudio version: {torchaudio.__version__}')" || echo "⚠️ Warning: Torchaudio import failed, will address in testing phase")
+    # Verify torchaudio import again after potential install
+    && (python3 -c "import torchaudio; print(f'✓ Torchaudio version: {torchaudio.__version__}')" || echo "⚠️ Warning: Torchaudio import failed after install attempt")
 
 # Install CSM additional dependencies (with fallbacks for packages that might fail)
 RUN pip3 install --no-cache-dir einops && \
@@ -91,16 +95,9 @@ RUN pip3 install --no-cache-dir einops && \
     pip3 install --no-cache-dir datasets && \
     echo "✓ Installed datasets: $(pip show datasets | grep Version)" || echo "Warning: Failed to install datasets"
 
-# Add an explicit installation attempt for both torchaudio and required libraries
-# This is needed because of potential compatibility issues with the PyTorch version
-RUN pip3 install --no-cache-dir torchaudio==2.6.0 && \
-    echo "✓ Installed torchaudio successfully" || \
-    (echo "⚠️ Warning: First torchaudio install attempt failed, trying with build tools" && \
-     apt-get update && \
-     apt-get install -y --no-install-recommends build-essential libsndfile1-dev && \
-     pip3 install --no-cache-dir torchaudio==2.6.0 && \
-     echo "✓ Installed torchaudio with build tools" || \
-     echo "⚠️ Warning: Could not install torchaudio, CSM testing might be limited")
+# Remove the redundant torchaudio installation block below
+# RUN pip3 install --no-cache-dir torchaudio==2.6.0 && \
+#    ... (removed) ...
 
 # torchao is included in the base image - no manual installation needed
 
@@ -158,6 +155,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh && \
 WORKDIR ${AUDIOBOOK_DATA}
 
 # Add health check to ensure container is functioning properly
+# Remove moshi and triton checks
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD python3 -c "import torch, torchaudio, torchao, csm; print('Health check passed.')" || exit 1
 
