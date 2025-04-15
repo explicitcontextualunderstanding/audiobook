@@ -27,11 +27,14 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_INDEX_URL=https://pypi.jetson-ai-lab.dev/jp6/cu128
 
 # Install system dependencies (git, wget, curl, unzip already in base)
-# Add ffmpeg, libsndfile1, python3-pip
+# Add ffmpeg, libsndfile1, python3-pip, cmake, libopus-dev
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
     python3-pip \
+    # Add cmake and libopus-dev for building dependencies like sphn (via audiopus_sys)
+    cmake \
+    libopus-dev \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && echo "✓ System dependencies installed"
@@ -66,6 +69,9 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     nltk \
     # Install torchaudio with a version that matches PyTorch 2.6.0
     torchaudio==2.6.0 \
+    # Add moshi and triton
+    moshi \
+    triton \
     && echo "✓ Core Python dependencies installed" \
     # Verify imports and check versions
     && python3 -c "import torch; print(f'✓ PyTorch version: {torch.__version__}')" \
