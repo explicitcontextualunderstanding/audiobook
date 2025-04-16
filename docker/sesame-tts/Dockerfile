@@ -18,7 +18,8 @@ ENV PYTHONUNBUFFERED=1 \
     BOOKS_DIR=/books \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=all \
-    CONDA_DIR=/opt/conda
+    CONDA_DIR=/opt/conda \
+    PATH="/root/.cargo/bin:${PATH}"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -30,12 +31,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     wget \
     curl \
+    pkg-config \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && echo "✓ System dependencies installed"
 
+# Install Rust (needed for moshi/sphn)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    . "$HOME/.cargo/env" && \
+    rustc --version && \
+    cargo --version && \
+    echo "✓ Rust installed"
+
 # Install Miniconda
-# Use the aarch64 installer for Jetson (ARM architecture)
 RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -O ~/miniconda.sh && \
     /bin/bash ~/miniconda.sh -b -p $CONDA_DIR && \
     rm ~/miniconda.sh
@@ -59,12 +67,21 @@ RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} /segments
 # Install Python dependencies within conda environment
 RUN conda install -y -c conda-forge ffmpeg && \
     pip install --upgrade pip setuptools wheel && \
-    pip install -U torch torchvision torchaudio \
-    tokenizers transformers huggingface_hub accelerate \
-    soundfile tqdm pydub psutil ebooklib beautifulsoup4 \
-    PyPDF2 pdfminer.six nltk einops rotary_embedding_torch \
-    vector_quantize_pytorch datasets && \
-    pip install torchtune torchao moshi && \
+    # Install torch packages first
+    pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 && \
+    # Install specific versions of packages known to work together
+    pip install tokenizers==0.13.3 transformers==4.31.0 huggingface_hub==0.16.4 accelerate==0.25.0 && \
+    pip install soundfile tqdm pydub psutil ebooklib beautifulsoup4 PyPDF2 pdfminer.six nltk && \
+    # Install einops with specific version for moshi
+    pip install einops==0.7.0 && \
+    # Install moshi specific dependencies
+    pip install "sphn>=0.1.4" sounddevice==0.5.0 && \
+    # Install other dependencies
+    pip install rotary_embedding_torch vector_quantize_pytorch datasets && \
+    # Install torchtune and torchao with compatible versions
+    pip install "torchtune<0.4.0" "torchao<0.5.0" && \
+    # Install moshi (older version for compatibility)
+    pip install "moshi<=0.2.2" && \
     echo "✓ Core Python dependencies installed"
 
 # Install silentcipher for watermarking
