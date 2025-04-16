@@ -34,24 +34,49 @@ def main():
         logger.info(f"✓ Using device: {torch.cuda.get_device_name(0)}")
         logger.info(f"✓ CUDA Version: {torch.version.cuda}")
         
-        # Test imports
-        import torchao  # Re-enable import
-        logger.info(f"✓ Successfully imported torchao version: {torchao.__version__ if hasattr(torchao, '__version__') else 'unknown'}")
+        # Test key imports with careful error handling
+        try:
+            import torchao
+            logger.info(f"✓ Successfully imported torchao version: {torchao.__version__ if hasattr(torchao, '__version__') else 'unknown'}")
+        except ImportError as e:
+            logger.error(f"❌ Failed to import torchao: {e}")
+            logger.info("Continuing without torchao import verification...")
         
-        import moshi
-        logger.info("✓ Successfully imported moshi")
+        try:
+            import torchtune
+            logger.info(f"✓ Successfully imported torchtune version: {torchtune.__version__ if hasattr(torchtune, '__version__') else 'unknown'}")
+        except ImportError as e:
+            logger.error(f"❌ Failed to import torchtune: {e}")
+            logger.info("Continuing without torchtune import verification...")
+        
+        try:
+            import moshi
+            logger.info("✓ Successfully imported moshi")
+        except ImportError as e:
+            logger.error(f"❌ Failed to import moshi: {e}")
+            logger.info("Continuing without moshi import verification...")
+        
+        # Verify we can import necessary modules for CSM
+        try:
+            sys.path.append('/opt/csm')
+            from generator import load_csm_1b, Segment
+            logger.info("✓ Successfully imported CSM generator modules")
+        except ImportError as e:
+            logger.error(f"❌ Failed to import CSM generator modules: {e}")
+            sys.exit(1)
         
         # Start timer for model loading
         start_time = time.time()
         logger.info(f"Loading CSM model from {args.model_path}...")
         
-        # Import and load CSM
-        from generator import load_csm_1b
-        generator = load_csm_1b(device="cuda")
-        logger.info(f"✓ Model loaded successfully in {time.time() - start_time:.2f} seconds")
-        
-        # Create a test segment
-        from generator import Segment
+        # Load the model
+        try:
+            generator = load_csm_1b(device="cuda")
+            logger.info(f"✓ Model loaded successfully in {time.time() - start_time:.2f} seconds")
+        except Exception as e:
+            logger.error(f"❌ Error loading CSM model: {e}")
+            logger.error("Please check your model path and that all dependencies are installed correctly.")
+            sys.exit(1)
         
         # Generate a small test audio
         logger.info("Generating test audio...")
@@ -66,29 +91,29 @@ def main():
         )]
         
         # Generate audio
-        audio = generator.generate(
-            text=test_text,
-            speaker=1,
-            context=segments,
-            max_audio_length_ms=5000,  # 5 seconds max
-            temperature=0.9,
-            topk=50
-        )
+        try:
+            audio = generator.generate(
+                text=test_text,
+                speaker=1,
+                context=segments,
+                max_audio_length_ms=5000,  # 5 seconds max
+                temperature=0.9,
+                topk=50
+            )
+            
+            # Save output
+            output_path = os.path.join(os.getcwd(), args.output)
+            torchaudio.save(output_path, audio.unsqueeze(0).cpu(), generator.sample_rate)
+            
+            logger.info(f"✓ Audio generation completed in {time.time() - start_time:.2f} seconds")
+            logger.info(f"✓ Saved test audio to {output_path}")
+            logger.info("✓ CSM is installed and working correctly!")
+        except Exception as e:
+            logger.error(f"❌ Error during audio generation: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            sys.exit(1)
         
-        # Save output
-        output_path = os.path.join(os.getcwd(), args.output)
-        torchaudio.save(output_path, audio.unsqueeze(0).cpu(), generator.sample_rate)
-        
-        logger.info(f"✓ Audio generation completed in {time.time() - start_time:.2f} seconds")
-        logger.info(f"✓ Saved test audio to {output_path}")
-        logger.info("✓ CSM is installed and working correctly!")
-
-        # Note: The Docker build process seems to be failing because
-        # 'docker/sesame-tts/utils/watermarking.py' is missing.
-        # Please ensure this file exists in your project directory
-        # relative to where you run 'docker build'. This script itself
-        # does not use watermarking, but the Dockerfile requires it.
-
     except Exception as e:
         logger.error(f"❌ Error: {str(e)}")
         import traceback

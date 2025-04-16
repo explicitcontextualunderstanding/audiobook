@@ -19,16 +19,28 @@ echo "  - $BOOKS_DIR/generate_audiobook_sesame_epub.py - Optimized for EPUB form
 echo "  - $BOOKS_DIR/extract_chapters.py - Extract chapter information"
 echo ""
 echo "Example usage:"
-echo "  python $BOOKS_DIR/generate_audiobook_sesame.py \\"
+echo "  conda run -n tts python $BOOKS_DIR/generate_audiobook_sesame.py \\"
 echo "    --input $BOOKS_DIR/your_book.epub \\"
 echo "    --output $AUDIOBOOK_DATA/audiobook_sesame.mp3 \\"
 echo "    --model_path $MODELS_DIR/sesame-csm-1b \\"
 echo "    --voice_preset calm"
 echo ""
 echo "Test the CSM installation by running:"
-echo "  python /usr/local/bin/utils/test_csm.py $MODELS_DIR/sesame-csm-1b"
+echo "  conda run -n tts python /usr/local/bin/utils/test_csm.py $MODELS_DIR/sesame-csm-1b"
+echo ""
+echo "Note: Remember to use 'conda run -n tts' before any Python commands"
+echo "to ensure they run within the conda environment."
 echo ""
 echo "====================================================="
 
-# Execute the command with activated Conda environment
-exec "$@"
+# Activate the conda environment for interactive sessions
+source ~/.bashrc
+
+# Execute the command
+if [ "$#" -eq 0 ]; then
+    # If no command was provided, start an interactive shell
+    /bin/bash
+else
+    # Otherwise, execute the provided command
+    exec "$@"
+fi
