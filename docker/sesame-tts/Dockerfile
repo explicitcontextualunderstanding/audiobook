@@ -68,8 +68,6 @@ RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} /segments
 # Install Python dependencies within conda environment
 RUN conda install -y -c conda-forge ffmpeg && \
     pip install --upgrade pip setuptools wheel && \
-    # Install torch packages first
-    pip install torch==2.1.0 torchvision==0.16.0 torchaudio==2.1.0 && \
     # Install specific versions of packages known to work together
     pip install tokenizers==0.13.3 transformers==4.31.0 huggingface_hub==0.16.4 accelerate==0.25.0 && \
     pip install soundfile tqdm pydub psutil ebooklib beautifulsoup4 PyPDF2 pdfminer.six nltk && \
