@@ -1,6 +1,6 @@
-# Use the dustynv PyTorch image for JetPack 6.1+ (L4T r36.4.0)
-# Includes PyTorch 2.6, CUDA 12.8. Does NOT include torchao by default.
-ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
+# Use the official torchao image for JetPack 6.1+ (L4T r36.4.0)
+# Includes PyTorch 2.6, CUDA 12.8, torchao 0.11.0
+ARG BASE_IMAGE=dustynv/torchao:0.11.0-r36.4.0-cu128-24.04
 FROM ${BASE_IMAGE}
 
 # Add container metadata
@@ -57,8 +57,9 @@ RUN python3 -c "import torchaudio; print(f'✓ Torchaudio version found in base:
     echo "✓ Torchaudio not found in base image, will attempt install."
 
 # Upgrade pip and install core dependencies
-# NOTE: PyTorch is provided by the base image. Torchaudio might be.
-# Install moshi, triton, and torchao as they are required by CSM/torchtune/runtime.
+# NOTE: PyTorch and torchao are provided by the base image. Torchaudio might be.
+# Install moshi and triton as they are required by CSM/runtime.
+# Skip torchao import check during build due to conflict with installed triton.
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     pip3 install --no-cache-dir \
     tokenizers \
@@ -77,16 +78,14 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
     # Install runtime dependencies: moshi, triton
     moshi \
     triton \
-    # Install torchao (required by torchtune, which is required by CSM)
-    torchao==0.11.0 \
+    # torchao is provided by base image
     # Attempt to install torchaudio==2.6.0 only if not found in base
     && (python3 -c "import torchaudio" || pip3 install --no-cache-dir torchaudio==2.6.0 || echo "⚠️ Warning: Failed to install torchaudio==2.6.0") \
     && echo "✓ Core Python dependencies installed" \
     # Verify imports and check versions
     && python3 -c "import torch; print(f'✓ PyTorch version: {torch.__version__}')" \
     && python3 -c "import torch; print(f'✓ PyTorch CUDA version: {torch.version.cuda}')" \
-    # Verify torchao installation
-    && python3 -c "import torchao; print(f'✓ torchao version: {torchao.__version__}')" \
+    # Verify transformers version
     && python3 -c "import transformers; print(f'✓ Transformers version: {transformers.__version__}')" \
     # Verify torchaudio import again after potential install
     && (python3 -c "import torchaudio; print(f'✓ Torchaudio version: {torchaudio.__version__}')" || echo "⚠️ Warning: Torchaudio import failed after install attempt") \
@@ -158,7 +157,7 @@ RUN chmod +x /usr/local/bin/entrypoint.sh && \
 WORKDIR ${AUDIOBOOK_DATA}
 
 # Add health check to ensure container is functioning properly
-# Add torchao back to the check
+# torchao should be present from base image
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD python3 -c "import torch, torchaudio, torchao, csm, moshi, triton; print('Health check passed.')" || exit 1
 
