@@ -1,5 +1,6 @@
-# Use NVIDIA's CUDA base image for Jetson Orin
-FROM nvcr.io/nvidia/cuda:12.8.0-devel-ubuntu22.04
+# Use DustyNV's PyTorch container for Jetson Orin (JP 6.1 / L4T r36.4.x / Ubuntu 24.04)
+# Includes PyTorch 2.6 and CUDA 12.8
+FROM dustynv/pytorch:2.6-r36.4.0-cu128-24.04
 
 # Add container metadata
 LABEL org.opencontainers.image.description="Sesame CSM text-to-speech for Jetson"
