@@ -246,6 +246,7 @@ When running commands:
 Note: Files saved to `/data` inside the container will be available at `~/jetson-containers/data` on the host, not at `~/audiobook_data`.
 
 ## 4. Approach 2: Using Sesame CSM for Higher Quality Voice
+Reference container: https://github.com/l3lackcurtains/csm-tts
 
 ### 4.1 Set Up Environment for Sesame CSM
 ```bash
