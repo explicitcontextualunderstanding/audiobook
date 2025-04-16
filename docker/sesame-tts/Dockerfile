@@ -99,9 +99,7 @@ COPY docker/sesame-tts/utils/watermarking.py /opt/csm/
 RUN chmod +x /opt/csm/watermarking.py
 
 # Copy and apply the generator patch
-COPY docker/sesame-tts/utils/generator_patch.py /opt/csm/
-RUN chmod +x /opt/csm/generator_patch.py
-RUN python -c "import sys; sys.path.append('/opt/csm'); from generator_patch import patch_csm_generator; patch_csm_generator()"
+COPY docker/sesame-tts/utils/audiobook_generator.py /opt/csm/
 
 # Add CSM to Python path
 RUN python -c "import sys; import site; print(site.getsitepackages()[0])" > /tmp/python_path && \

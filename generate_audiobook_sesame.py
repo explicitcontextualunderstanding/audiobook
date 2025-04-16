@@ -17,7 +17,11 @@ sys.path.insert(0, '/opt/csm')
 
 try:
     # Import according to new usage
-    from generator import load_csm_1b, Segment
+    try:
+        from audiobook_generator import load_csm_1b, Segment
+    except ModuleNotFoundError:
+        print("Error: 'audiobook_generator' module not found. Ensure it is installed or its path is added to sys.path.")
+        sys.exit(1)
 except ImportError as e:
     print("Failed to import from generator (ensure csm installed correctly).")
     print("PYTHONPATH:", os.environ.get('PYTHONPATH'))

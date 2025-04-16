@@ -59,7 +59,7 @@ def main():
         # Verify we can import necessary modules for CSM
         try:
             sys.path.append('/opt/csm')
-            from generator import load_csm_1b, Segment
+            from audiobook_generator import load_csm_1b, Segment
             logger.info("✓ Successfully imported CSM generator modules")
         except ImportError as e:
             logger.error(f"❌ Failed to import CSM generator modules: {e}")

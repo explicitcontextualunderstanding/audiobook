@@ -65,10 +65,10 @@ def patch_csm_generator():
             
         try:""")
         
-        # Close the try block
+        # Close the try block - Fix indentation of return audio (8 spaces, not 4)
         patched_content = patched_content.replace(
             "return audio",
-            """    return audio
+            """        return audio
         except Exception as e:
             import traceback
             print(f"Error in generate: {e}")
