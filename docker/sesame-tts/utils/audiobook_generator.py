@@ -101,15 +101,33 @@ def load_csm_1b(*args, **kwargs):
     Drop-in replacement for the original load_csm_1b function that returns
     our enhanced AudiobookGenerator.
     
-    This implementation is specifically designed to match how the test_csm.py
-    and generation scripts use the function - they expect a single generator object,
-    not the (model, params) tuple that the original function returns internally.
+    Based on examining the original CSM repository, the original load_csm_1b
+    returns a Generator instance directly, not a tuple of (model, params).
     
     All arguments are passed through to the original function.
     """
-    model, params = original_load_csm_1b(*args, **kwargs)
-    enhanced_generator = AudiobookGenerator(model, params)
-    # Return only the generator to match how test_csm.py uses it
+    # The original CSM implementation returns a Generator object directly
+    original_generator = original_load_csm_1b(*args, **kwargs)
+    
+    # Extract the model from the original generator
+    model = original_generator._model
+    
+    # Create our enhanced generator with the model
+    enhanced_generator = AudiobookGenerator(model)
+    
+    # Copy any other important attributes
+    if hasattr(original_generator, 'sample_rate'):
+        enhanced_generator.sample_rate = original_generator.sample_rate
+    if hasattr(original_generator, 'device'):
+        enhanced_generator.device = original_generator.device
+    if hasattr(original_generator, '_watermarker'):
+        enhanced_generator._watermarker = original_generator._watermarker
+    if hasattr(original_generator, '_text_tokenizer'):
+        enhanced_generator._text_tokenizer = original_generator._text_tokenizer
+    if hasattr(original_generator, '_audio_tokenizer'):
+        enhanced_generator._audio_tokenizer = original_generator._audio_tokenizer
+    
+    # Return our enhanced generator
     return enhanced_generator
 
 # Re-export necessary components to maintain the same interface
