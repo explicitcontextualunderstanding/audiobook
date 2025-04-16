@@ -76,8 +76,8 @@ RUN conda install -y -c conda-forge ffmpeg && \
     pip install "sphn>=0.1.4" sounddevice==0.5.0 && \
     # Install other dependencies
     pip install rotary_embedding_torch vector_quantize_pytorch datasets && \
-    # REMOVED Install torchtune and torchao
-    # pip install "torchtune<0.4.0" torchao && \
+    # Install torchtune and torchao - We found they work with Python 3.10
+    pip install "torchtune<0.4.0" torchao && \
     # Install moshi (older version for compatibility)
     pip install "moshi<=0.2.2" && \
     echo "✓ Core Python dependencies installed"
@@ -94,9 +94,14 @@ from .generator import load_csm_1b, Segment, Generator\n\
 __all__ = ["load_csm_1b", "Segment", "Generator"]\n\
 ' > /opt/csm/__init__.py
 
-# Copy watermarking module
+# Copy the watermarking module
 COPY docker/sesame-tts/utils/watermarking.py /opt/csm/
 RUN chmod +x /opt/csm/watermarking.py
+
+# Copy and apply the generator patch
+COPY docker/sesame-tts/utils/generator_patch.py /opt/csm/
+RUN chmod +x /opt/csm/generator_patch.py
+RUN python -c "import sys; sys.path.append('/opt/csm'); from generator_patch import patch_csm_generator; patch_csm_generator()"
 
 # Add CSM to Python path
 RUN python -c "import sys; import site; print(site.getsitepackages()[0])" > /tmp/python_path && \
@@ -125,9 +130,9 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # Set working directory
 WORKDIR ${AUDIOBOOK_DATA}
 
-# Add health check - Removed torchao import
+# Add health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD conda run -n tts python -c "import torch, moshi; print('Health check passed.')" || exit 1
+    CMD conda run -n tts python -c "import torch, moshi, torchao; print('Health check passed.')" || exit 1
 
 # Set entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
