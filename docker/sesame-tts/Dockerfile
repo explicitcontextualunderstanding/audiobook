@@ -52,8 +52,8 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aar
 # Add conda to PATH
 ENV PATH=$CONDA_DIR/bin:$PATH
 
-# Create conda environment with Python 3.10
-RUN conda create -y -n tts python=3.10 && \
+# Create conda environment with Python 3.9
+RUN conda create -y -n tts python=3.9 && \
     conda clean -ya
 
 # Make RUN commands use the conda environment
@@ -77,8 +77,8 @@ RUN conda install -y -c conda-forge ffmpeg && \
     pip install "sphn>=0.1.4" sounddevice==0.5.0 && \
     # Install other dependencies
     pip install rotary_embedding_torch vector_quantize_pytorch datasets && \
-    # Install torchtune and torchao with compatible versions
-    pip install "torchtune<0.4.0" "torchao<0.5.0" && \
+    # Install torchtune and torchao - Removed torchao version constraint
+    pip install "torchtune<0.4.0" torchao && \
     # Install moshi (older version for compatibility)
     pip install "moshi<=0.2.2" && \
     echo "✓ Core Python dependencies installed"
