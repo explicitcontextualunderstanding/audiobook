@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import sys
 import torch
 import argparse
 from tqdm import tqdm
@@ -13,6 +14,9 @@ from nltk.tokenize import sent_tokenize
 import nltk
 import re
 import time
+
+# Add /opt/csm to path to help find generator modules
+sys.path.insert(0, '/opt/csm')
 
 # Download NLTK resources if not already downloaded
 try:
@@ -119,9 +123,21 @@ def main():
     
     # Load CSM model
     print("Loading Sesame CSM model...")
-    from csm import CSMModel
-    model = CSMModel.from_pretrained("sesame/csm-1b")
-    model = model.half().to("cuda")  # Use half precision to save memory
+    try:
+        # Try to use enhanced audiobook generator first
+        try:
+            from audiobook_generator import load_csm_1b, Segment
+            print("Using enhanced audiobook generator with error handling")
+        except ImportError:
+            # Fall back to original if needed
+            from generator import load_csm_1b, Segment
+            print("Using original CSM generator")
+            
+        model = load_csm_1b(device="cuda")
+        model = model.half()  # Use half precision to save memory
+    except Exception as e:
+        print(f"Error loading CSM model: {e}")
+        sys.exit(1)
     
     # Process each chunk
     print(f"Processing {len(chunks)} text segments...")
