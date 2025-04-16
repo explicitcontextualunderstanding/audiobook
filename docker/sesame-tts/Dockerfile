@@ -52,8 +52,8 @@ RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aar
 # Add conda to PATH
 ENV PATH=$CONDA_DIR/bin:$PATH
 
-# Create conda environment with Python 3.9
-RUN conda create -y -n tts python=3.9 && \
+# Create conda environment with Python 3.10
+RUN conda create -y -n tts python=3.10 && \
     conda clean -ya
 
 # Make RUN commands use the conda environment
@@ -68,6 +68,8 @@ RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} /segments
 # Install Python dependencies within conda environment
 RUN conda install -y -c conda-forge ffmpeg && \
     pip install --upgrade pip setuptools wheel && \
+    # Install torch==2.6.0 and compatible torchvision/torchaudio from the Jetson index
+    pip install torch==2.6.0 torchvision torchaudio && \
     # Install specific versions of packages known to work together
     pip install tokenizers==0.13.3 transformers==4.31.0 huggingface_hub==0.16.4 accelerate==0.25.0 && \
     pip install soundfile tqdm pydub psutil ebooklib beautifulsoup4 PyPDF2 pdfminer.six nltk && \
@@ -77,8 +79,8 @@ RUN conda install -y -c conda-forge ffmpeg && \
     pip install "sphn>=0.1.4" sounddevice==0.5.0 && \
     # Install other dependencies
     pip install rotary_embedding_torch vector_quantize_pytorch datasets && \
-    # Install torchtune and torchao - Removed torchao version constraint
-    pip install "torchtune<0.4.0" torchao && \
+    # REMOVED Install torchtune and torchao
+    # pip install "torchtune<0.4.0" torchao && \
     # Install moshi (older version for compatibility)
     pip install "moshi<=0.2.2" && \
     echo "✓ Core Python dependencies installed"
@@ -126,9 +128,9 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # Set working directory
 WORKDIR ${AUDIOBOOK_DATA}
 
-# Add health check
+# Add health check - Removed torchao import
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD conda run -n tts python -c "import torch, torchao, moshi; print('Health check passed.')" || exit 1
+    CMD conda run -n tts python -c "import torch, moshi; print('Health check passed.')" || exit 1
 
 # Set entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
