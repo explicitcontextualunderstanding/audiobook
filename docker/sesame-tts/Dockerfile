@@ -132,5 +132,5 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
 # Set entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
-# Default command - Changed to just bash
-CMD ["bash"]
+# Default command - Use conda run to ensure environment is active for bash
+CMD ["conda", "run", "-n", "tts", "--no-capture-output", "bash"]

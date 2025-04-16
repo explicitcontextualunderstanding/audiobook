@@ -1,46 +1,44 @@
 #!/bin/bash
 set -e
 
-echo "====================================================="
-echo "Sesame CSM Text-to-Speech for Audiobook Generation"
-echo "====================================================="
-echo ""
-echo "This container provides Sesame CSM Text-to-Speech capabilities"
-echo "specifically configured for audiobook generation on Jetson devices."
-echo ""
-echo "Environment paths:"
-echo "  - Books directory: $BOOKS_DIR"
-echo "  - Audiobook data directory: $AUDIOBOOK_DATA"
-echo "  - Models directory: $MODELS_DIR"
-echo ""
-echo "Available scripts:"
-echo "  - $BOOKS_DIR/generate_audiobook_sesame.py - Main script for both EPUB and PDF"
-echo "  - $BOOKS_DIR/generate_audiobook_sesame_epub.py - Optimized for EPUB format"
-echo "  - $BOOKS_DIR/extract_chapters.py - Extract chapter information"
-echo ""
-echo "Example usage:"
-echo "  conda run -n tts python $BOOKS_DIR/generate_audiobook_sesame.py \\"
-echo "    --input $BOOKS_DIR/your_book.epub \\"
-echo "    --output $AUDIOBOOK_DATA/audiobook_sesame.mp3 \\"
-echo "    --model_path $MODELS_DIR/sesame-csm-1b \\"
-echo "    --voice_preset calm"
-echo ""
-echo "Test the CSM installation by running:"
-echo "  conda run -n tts python /usr/local/bin/utils/test_csm.py $MODELS_DIR/sesame-csm-1b"
-echo ""
-echo "Note: Remember to use 'conda run -n tts' before any Python commands"
-echo "to ensure they run within the conda environment."
-echo ""
-echo "====================================================="
+# --- Removed conda activation ---
+# source /opt/conda/etc/profile.d/conda.sh
+# conda activate tts
 
-# Activate the conda environment for interactive sessions
-source ~/.bashrc
+# Print welcome message
+cat << 'EOF'
+=====================================================
+Sesame CSM Text-to-Speech for Audiobook Generation
+=====================================================
 
-# Execute the command
-if [ "$#" -eq 0 ]; then
-    # If no command was provided, start an interactive shell
-    /bin/bash
-else
-    # Otherwise, execute the provided command
-    exec "$@"
-fi
+This container provides Sesame CSM Text-to-Speech capabilities
+specifically configured for audiobook generation on Jetson devices.
+
+Environment paths:
+  - Books directory: /books
+  - Audiobook data directory: /audiobook_data
+  - Models directory: /models
+
+Available scripts:
+  - /books/generate_audiobook_sesame.py - Main script for both EPUB and PDF
+  - /books/generate_audiobook_sesame_epub.py - Optimized for EPUB format
+  - /books/extract_chapters.py - Extract chapter information
+
+Example usage:
+  python /books/generate_audiobook_sesame.py \
+    --input /books/your_book.epub \
+    --output /audiobook_data/audiobook_sesame.mp3 \
+    --model_path /models/sesame-csm-1b \
+    --voice_preset calm
+
+Test the CSM installation by running:
+  python /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b
+
+Note: The 'tts' conda environment is active in this shell.
+
+=====================================================
+EOF
+
+
+# Execute the command passed to the container (which will be the CMD from Dockerfile)
+exec "$@"
