@@ -99,15 +99,18 @@ class AudiobookGenerator(OriginalGenerator):
 def load_csm_1b(*args, **kwargs):
     """
     Drop-in replacement for the original load_csm_1b function that returns
-    our enhanced AudiobookGenerator instead.
+    our enhanced AudiobookGenerator.
+    
+    This implementation is specifically designed to match how the test_csm.py
+    and generation scripts use the function - they expect a single generator object,
+    not the (model, params) tuple that the original function returns internally.
     
     All arguments are passed through to the original function.
-    Returns the same tuple format as the original function for compatibility.
     """
     model, params = original_load_csm_1b(*args, **kwargs)
     enhanced_generator = AudiobookGenerator(model, params)
-    # Return the generator and params to maintain the same interface
-    return enhanced_generator, params
+    # Return only the generator to match how test_csm.py uses it
+    return enhanced_generator
 
 # Re-export necessary components to maintain the same interface
 __all__ = ["load_csm_1b", "Segment", "AudiobookGenerator"]
