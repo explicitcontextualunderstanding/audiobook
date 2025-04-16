@@ -335,20 +335,22 @@ pip install --extra-index-url https://pypi.jetsonhacks.com/ torch
 
 After further testing, the strategy of using a base image *without* `torchao` and installing it manually led back to build complexities or the original conflict. Therefore, we have reverted to the previous approach which prioritizes getting a build completed, accepting a potential runtime risk:
 
-1.  **Base Image:** Uses `dustynv/torchao:0.11.0-r36.4.0-cu128-24.04`.
-    *   Provides PyTorch 2.6, CUDA 12.8, and **`torchao==0.11.0`** pre-installed for JetPack 6.1+.
-2.  **Dependency Chain:**
+1.  **Base Image:** Uses `nvcr.io/nvidia/cuda:12.8.0-devel-ubuntu22.04`.
+    *   Provides CUDA 12.8 development environment for JetPack 6.1+.
+2.  **Miniconda:** Installs Miniconda specifically for the `aarch64` architecture (required for Jetson) to avoid `Exec format error`.
+3.  **Dependency Chain:**
+    *   Installs PyTorch, TorchVision, TorchAudio compatible with CUDA 12.8 via `pip`.
     *   CSM (`models.py`) requires `torchtune`.
-    *   `torchtune` requires `torchao` (provided by base image).
-    *   CSM also requires `moshi` and `triton` (runtime needs).
-3.  **Installation Strategy:**
-    *   Installs `moshi` and `triton` explicitly via `pip` using the Jetson PyPI index (as they are runtime needs).
-    *   Installs `torchtune` and other Python packages.
-    *   **Crucially, the build-time check for `import torchao` is SKIPPED** in the Dockerfile step where `triton` is installed. This is necessary because `triton==3.3.0` (from Jetson PyPI) appears incompatible with the base image's `torchao==0.11.0` during this specific check, causing the build to fail otherwise.
-4.  **CSM Code:** Downloads the necessary `generator.py` and `models.py` files and adds them to the Python path.
-5.  **Accepted Risk:** This strategy allows the Docker image to build successfully by ignoring the build-time incompatibility. However, there is a risk that this underlying incompatibility between the base image's `torchao` and the pip-installed `triton` could cause subtle errors during the actual runtime execution of the CSM model. Thorough testing after building is essential.
+    *   `torchtune` requires `torchao`.
+    *   CSM also requires `moshi`.
+4.  **Installation Strategy:**
+    *   Creates a Conda environment.
+    *   Installs `torch`, `torchvision`, `torchaudio` via `pip`.
+    *   Installs `torchtune`, `torchao`, `moshi`, and other Python packages via `pip`.
+5.  **CSM Code:** Downloads the necessary `generator.py` and `models.py` files and adds them to the Python path.
+6.  **Potential Risks:** Dependency conflicts might still arise at runtime, especially between different versions of `torch`, `torchao`, `torchtune`, and potentially `triton` if it gets pulled in indirectly. Thorough testing after building is essential.
 
-Now you can proceed with building and running the container using this reverted strategy.
+Now you can proceed with building and running the container using this strategy.
 
 ```bash
 # Option 1: Using the quickstart.sh script
