@@ -102,9 +102,12 @@ def load_csm_1b(*args, **kwargs):
     our enhanced AudiobookGenerator instead.
     
     All arguments are passed through to the original function.
+    Returns the same tuple format as the original function for compatibility.
     """
     model, params = original_load_csm_1b(*args, **kwargs)
-    return AudiobookGenerator(model, params)
+    enhanced_generator = AudiobookGenerator(model, params)
+    # Return the generator and params to maintain the same interface
+    return enhanced_generator, params
 
 # Re-export necessary components to maintain the same interface
 __all__ = ["load_csm_1b", "Segment", "AudiobookGenerator"]
