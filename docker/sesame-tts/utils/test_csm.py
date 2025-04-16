@@ -71,7 +71,15 @@ def main():
         
         # Load the model
         try:
-            generator = load_csm_1b(device="cuda")
+            # Handle both possible return types (single generator or tuple)
+            result = load_csm_1b(device="cuda")
+            
+            # If it's a tuple, extract the generator
+            if isinstance(result, tuple) and len(result) >= 1:
+                generator = result[0]
+            else:
+                generator = result
+                
             logger.info(f"✓ Model loaded successfully in {time.time() - start_time:.2f} seconds")
         except Exception as e:
             logger.error(f"❌ Error loading CSM model: {e}")
