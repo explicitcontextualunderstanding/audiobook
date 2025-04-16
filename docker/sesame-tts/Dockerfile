@@ -59,9 +59,6 @@ RUN conda create -y -n tts python=3.10 && \
 # Make RUN commands use the conda environment
 SHELL ["conda", "run", "-n", "tts", "/bin/bash", "-c"]
 
-# Set environment activation on interactive shells
-RUN echo "conda activate tts" >> ~/.bashrc
-
 # Create necessary directories
 RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} /segments
 
