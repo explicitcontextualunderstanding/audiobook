@@ -1,7 +1,5 @@
-# Use the official torchao image for JetPack 6.1+ (L4T r36.4.0)
-# Includes PyTorch 2.6, CUDA 12.8, torchao 0.11.0
-ARG BASE_IMAGE=dustynv/torchao:0.11.0-r36.4.0-cu128-24.04
-FROM ${BASE_IMAGE}
+# Use NVIDIA's CUDA base image for Jetson Orin
+FROM nvcr.io/nvidia/cuda:12.8.0-devel-ubuntu22.04
 
 # Add container metadata
 LABEL org.opencontainers.image.description="Sesame CSM text-to-speech for Jetson"
@@ -9,163 +7,114 @@ LABEL org.opencontainers.image.source="https://github.com/SesameAILabs/csm"
 LABEL com.nvidia.jetpack.version="6.1"
 LABEL com.nvidia.cuda.version="12.8"
 
-# This image is based on JetPack 6.1+ (L4T r36.4.x) with Ubuntu 24.04
-
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     NO_TORCH_COMPILE=1 \
-    PATH="/root/.cargo/bin:${PATH}" \
     DEBIAN_FRONTEND=noninteractive \
     MODELS_DIR=/models \
     AUDIOBOOK_DATA=/audiobook_data \
     BOOKS_DIR=/books \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=all \
-    # Explicitly set the pip index URL to use the Jetson pip server
-    # This provides pre-built wheels optimized for Jetson, speeding up builds
-    # and avoiding potential compilation issues for complex packages.
-    PIP_INDEX_URL=https://pypi.jetson-ai-lab.dev/jp6/cu128
+    CONDA_DIR=/opt/conda
 
-# Install system dependencies (git, wget, curl, unzip already in base)
-# Add ffmpeg, libsndfile1, python3-pip, cmake, libopus-dev, build-essential
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libsndfile1 \
-    python3-pip \
-    # Add cmake and libopus-dev for building dependencies like sphn (via audiopus_sys)
     cmake \
     libopus-dev \
-    # Add build-essential for packages needing compilation
     build-essential \
+    git \
+    wget \
+    curl \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && echo "✓ System dependencies installed"
 
-# Install Rust/Cargo (needed for some Python dependencies)
-# Rust/Cargo might already be in the base, but installing ensures it's present
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y \
-    && echo "✓ Rust installed: $(rustc --version)"
+# Install Miniconda
+RUN wget --quiet https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O ~/miniconda.sh && \
+    /bin/bash ~/miniconda.sh -b -p $CONDA_DIR && \
+    rm ~/miniconda.sh
+
+# Add conda to PATH
+ENV PATH=$CONDA_DIR/bin:$PATH
+
+# Create conda environment with Python 3.10
+RUN conda create -y -n tts python=3.10 && \
+    conda clean -ya
+
+# Make RUN commands use the conda environment
+SHELL ["conda", "run", "-n", "tts", "/bin/bash", "-c"]
+
+# Set environment activation on interactive shells
+RUN echo "conda activate tts" >> ~/.bashrc
 
 # Create necessary directories
-RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} \
-    && echo "✓ Directories created"
+RUN mkdir -p /opt/csm ${AUDIOBOOK_DATA} ${BOOKS_DIR} ${MODELS_DIR} /segments
 
-# Check if torchaudio is already in the base image
-RUN python3 -c "import torchaudio; print(f'✓ Torchaudio version found in base: {torchaudio.__version__}')" || \
-    echo "✓ Torchaudio not found in base image, will attempt install."
+# Install Python dependencies within conda environment
+RUN conda install -y -c conda-forge ffmpeg && \
+    pip install --upgrade pip setuptools wheel && \
+    pip install -U torch torchvision torchaudio \
+    tokenizers transformers huggingface_hub accelerate \
+    soundfile tqdm pydub psutil ebooklib beautifulsoup4 \
+    PyPDF2 pdfminer.six nltk einops rotary_embedding_torch \
+    vector_quantize_pytorch datasets && \
+    pip install torchtune torchao moshi && \
+    echo "✓ Core Python dependencies installed"
 
-# Upgrade pip and install core dependencies
-# NOTE: PyTorch and torchao are provided by the base image. Torchaudio might be.
-# Install moshi and triton as they are required by CSM/runtime.
-# Skip torchao import check during build due to conflict with installed triton.
-RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip3 install --no-cache-dir \
-    tokenizers \
-    transformers \
-    huggingface_hub \
-    accelerate \
-    soundfile \
-    tqdm \
-    pydub \
-    psutil \
-    ebooklib \
-    beautifulsoup4 \
-    PyPDF2 \
-    pdfminer.six \
-    nltk \
-    # Install runtime dependencies: moshi, triton
-    moshi \
-    triton \
-    # torchao is provided by base image
-    # Attempt to install torchaudio==2.6.0 only if not found in base
-    && (python3 -c "import torchaudio" || pip3 install --no-cache-dir torchaudio==2.6.0 || echo "⚠️ Warning: Failed to install torchaudio==2.6.0") \
-    && echo "✓ Core Python dependencies installed" \
-    # Verify imports and check versions
-    && python3 -c "import torch; print(f'✓ PyTorch version: {torch.__version__}')" \
-    && python3 -c "import torch; print(f'✓ PyTorch CUDA version: {torch.version.cuda}')" \
-    # Verify transformers version
-    && python3 -c "import transformers; print(f'✓ Transformers version: {transformers.__version__}')" \
-    # Verify torchaudio import again after potential install
-    && (python3 -c "import torchaudio; print(f'✓ Torchaudio version: {torchaudio.__version__}')" || echo "⚠️ Warning: Torchaudio import failed after install attempt") \
-    # Verify moshi and triton imports
-    && (python3 -c "import moshi; print('✓ Moshi imported successfully')" || echo "⚠️ Warning: Moshi import failed") \
-    && (python3 -c "import triton; print('✓ Triton imported successfully')" || echo "⚠️ Warning: Triton import failed")
+# Install silentcipher for watermarking
+RUN pip install "silentcipher @ git+https://github.com/SesameAILabs/silentcipher@master"
 
-# Install CSM additional dependencies (with fallbacks for packages that might fail)
-RUN pip3 install --no-cache-dir einops && \
-    echo "✓ Installed einops: $(pip show einops | grep Version)" || echo "Warning: Failed to install einops" && \
-    pip3 install --no-cache-dir rotary_embedding_torch && \
-    echo "✓ Installed rotary_embedding_torch: $(pip show rotary_embedding_torch | grep Version)" || echo "Warning: Failed to install rotary_embedding_torch" && \
-    pip3 install --no-cache-dir vector_quantize_pytorch && \
-    echo "✓ Installed vector_quantize_pytorch: $(pip show vector_quantize_pytorch | grep Version)" || echo "Warning: Failed to install vector_quantize_pytorch" && \
-    pip3 install --no-cache-dir datasets && \
-    echo "✓ Installed datasets: $(pip show datasets | grep Version)" || echo "Warning: Failed to install datasets"
-
-# Install torchtune (try PyPI first, then GitHub)
-# Fail build if this step fails
-RUN (pip3 install --no-cache-dir torchtune && \
-     echo "✓ Installed torchtune from PyPI: $(pip show torchtune | grep Version)") || \
-    (export GIT_TERMINAL_PROMPT=0 && \
-     pip3 install --no-cache-dir git+https://github.com/pytorch/torchtune.git && \
-     echo "✓ Installed torchtune from GitHub") || \
-    (echo "ERROR: Failed to install torchtune from both PyPI and GitHub." && exit 1)
-
-
-# Download essential CSM files instead of cloning the full repository
+# Download essential CSM files
 WORKDIR /opt/csm
 RUN wget -q https://raw.githubusercontent.com/SesameAILabs/csm/main/generator.py && \
     wget -q https://raw.githubusercontent.com/SesameAILabs/csm/main/models.py && \
-    echo "✓ CSM files downloaded"
-
-# Create simple Python module to make imports work
-RUN echo '# CSM package\n\
+    echo '# CSM package\n\
 from .generator import load_csm_1b, Segment, Generator\n\
 __all__ = ["load_csm_1b", "Segment", "Generator"]\n\
 ' > /opt/csm/__init__.py
 
-# Add CSM to Python path directly instead of installing it
-RUN python3 -c "import sys; import site; print(site.getsitepackages()[0])" > /tmp/python_path && \
+# Copy watermarking module
+COPY docker/sesame-tts/utils/watermarking.py /opt/csm/
+RUN chmod +x /opt/csm/watermarking.py
+
+# Add CSM to Python path
+RUN python -c "import sys; import site; print(site.getsitepackages()[0])" > /tmp/python_path && \
     echo 'import sys; sys.path.append("/opt/csm")' > $(cat /tmp/python_path)/csm_path.pth && \
     rm /tmp/python_path && \
     echo "✓ CSM added to Python path"
 
 # Download NLTK data
-RUN python3 -c "import nltk; nltk.download('punkt')" && \
+RUN python -c "import nltk; nltk.download('punkt')" && \
     echo "✓ NLTK punkt downloaded"
 
-# Create a utilities directory
+# Create a utilities directory and copy the test script
 RUN mkdir -p /usr/local/bin/utils
-
-# Copy the test script from the repository
 COPY docker/sesame-tts/utils/test_csm.py /usr/local/bin/utils/
-RUN chmod +x /usr/local/bin/utils/test_csm.py && \
-    echo "✓ Test script copied"
+RUN chmod +x /usr/local/bin/utils/test_csm.py
 
-# Verify CUDA is available
-RUN echo "✓ CUDA Availability: $(python3 -c "import torch; print(torch.cuda.is_available())")" && \
-    echo "✓ CUDA Version: $(python3 -c "import torch; print(torch.version.cuda if torch.cuda.is_available() else 'Not available')")" && \
-    echo "✓ Device Count: $(python3 -c "import torch; print(torch.cuda.device_count())")"
+# Copy the audiobook generation scripts
+COPY generate_audiobook_sesame.py ${BOOKS_DIR}/
+COPY generate_audiobook_sesame_epub.py ${BOOKS_DIR}/
+COPY extract_chapters.py ${BOOKS_DIR}/
 
 # Copy the entrypoint script
 COPY docker/sesame-tts/entrypoint.sh /usr/local/bin/entrypoint.sh
-RUN chmod +x /usr/local/bin/entrypoint.sh && \
-    echo "✓ Entrypoint script installed"
+RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # Set working directory
 WORKDIR ${AUDIOBOOK_DATA}
 
-# Add health check to ensure container is functioning properly
-# torchao should be present from base image
+# Add health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD python3 -c "import torch, torchaudio, torchao, csm, moshi, triton; print('Health check passed.')" || exit 1
-
-# Print build completion message
-RUN echo "✓ Sesame-TTS container build completed successfully!"
+    CMD conda run -n tts python -c "import torch, torchao, moshi; print('Health check passed.')" || exit 1
 
 # Set entrypoint
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 # Default command
-CMD ["bash"]
+CMD ["conda", "run", "--no-capture-output", "-n", "tts", "bash"]
