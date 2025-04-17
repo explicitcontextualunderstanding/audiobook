@@ -16,8 +16,8 @@ COPY docker/sesame-tts/requirements.txt ./
 COPY docker/sesame-tts/build.sh ./
 COPY docker/sesame-tts/utils/ ./utils/
 
-# Run the build script with error checking
-RUN /bin/bash -c "set -e && ./build.sh"
+# Make build script executable and run it
+RUN chmod +x ./build.sh && /bin/bash -c "set -e && ./build.sh"
 
 # Add final workdir, health check and default command
 WORKDIR /workspace
