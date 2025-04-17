@@ -5,10 +5,19 @@ set -e
 export CUDA_HOME=/usr/local/cuda
 export PATH=$CUDA_HOME/bin:$PATH
 export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/lib/aarch64-linux-gnu
 export TORCH_USE_CUDA_DSA=1
 
 # Fix NVIDIA device visibility
 export NVIDIA_VISIBLE_DEVICES=all
+
+# Add JETSON specific environment variables
+export JETSON_DEVICE=1
+export TORCH_DISABLE_HIP=1
+export CUDA_MODULE_LOADING=LAZY
+
+# Check CUDA setup
+nvidia-smi || echo "Warning: nvidia-smi failed, CUDA might not be properly configured"
 
 # Print CUDA environment variables for debugging
 echo "CUDA Environment Variables:"
