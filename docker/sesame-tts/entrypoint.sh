@@ -1,9 +1,22 @@
 #!/bin/bash
 set -e
 
-# --- Removed conda activation ---
-# source /opt/conda/etc/profile.d/conda.sh
-# conda activate tts
+# Set up CUDA environment variables
+export CUDA_HOME=/usr/local/cuda
+export PATH=$CUDA_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+export TORCH_USE_CUDA_DSA=1
+
+# Fix NVIDIA device visibility
+export NVIDIA_VISIBLE_DEVICES=all
+
+# Print CUDA environment variables for debugging
+echo "CUDA Environment Variables:"
+env | grep -E 'CUDA|NVIDIA'
+
+# Activate conda environment
+source /opt/conda/etc/profile.d/conda.sh
+conda activate tts
 
 # Print welcome message
 cat << 'EOF'
