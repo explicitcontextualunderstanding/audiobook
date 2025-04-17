@@ -23,9 +23,16 @@ RUN chmod +x ./build.sh ./entrypoint.sh && /bin/bash -c "set -e && ./build.sh"
 # Add final workdir, health check and default command
 WORKDIR /workspace
 
+# Copy entrypoint script to final location
+COPY docker/sesame-tts/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Health check - runs inside the container to verify it's functioning properly
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
     CMD /opt/conda/bin/conda run -n tts python -c "import torch, moshi, torchao; print('Health check passed.')" || exit 1
+
+# Set the entrypoint script
+ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command - uses conda environment with full path
 CMD ["/opt/conda/bin/conda", "run", "-n", "tts", "--no-capture-output", "bash"]
