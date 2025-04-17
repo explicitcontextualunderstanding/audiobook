@@ -25,7 +25,8 @@ WORKDIR /workspace
 
 # Copy entrypoint script to final location
 COPY docker/sesame-tts/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY docker/sesame-tts/utils/force_cuda_test.sh /usr/local/bin/force_cuda_test.sh
+RUN chmod +x /entrypoint.sh /usr/local/bin/force_cuda_test.sh
 
 # Health check - runs inside the container to verify it's functioning properly
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
