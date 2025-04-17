@@ -59,12 +59,18 @@ source $CONDA_DIR/bin/activate tts
 conda install -y -c conda-forge ffmpeg
 pip install --no-cache-dir --upgrade pip setuptools wheel
 
-# Install PyTorch and related packages
-# Note: Using pre-built wheels from Jetson AI Lab PyPI for better performance
-pip install --no-cache-dir --verbose -r requirements.txt \
-    --index-url https://pypi.org/simple \
+# Install PyTorch and related packages specifically for Jetson
+# First uninstall any existing PyTorch packages
+pip uninstall -y torch torchvision torchaudio
+
+# Install NVIDIA's Jetson-specific PyTorch packages
+pip install --no-cache-dir --verbose \
+    torch torchvision torchaudio \
     --extra-index-url https://pypi.ngc.nvidia.com \
     --extra-index-url https://pypi.jetson-ai-lab.dev/simple
+
+# Then install the remaining requirements
+pip install --no-cache-dir --verbose -r requirements.txt
 
 # Install silentcipher for watermarking
 pip install --no-cache-dir "silentcipher @ git+https://github.com/SesameAILabs/silentcipher@master"
