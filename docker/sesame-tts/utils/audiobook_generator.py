@@ -49,10 +49,25 @@ OriginalGenerator = PlaceholderGenerator
 
 # Try to import the real components when running in the container
 try:
-    # Import the original generator components
-    from generator import load_csm_1b as original_load_csm_1b
-    from generator import Segment, Generator as OriginalGenerator
-    logger.info("Successfully imported CSM generator components")
+    # Add current path to sys.path for direct imports
+    import os
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    parent_dir = os.path.dirname(current_dir)
+    sys.path.insert(0, parent_dir)
+    sys.path.insert(0, current_dir)
+    
+    # Try different import strategies
+    try:
+        from generator import load_csm_1b as original_load_csm_1b
+        from generator import Segment, Generator as OriginalGenerator
+        logger.info("Successfully imported CSM generator components from direct import")
+    except ImportError:
+        # Alternative: Try importing from /opt/csm with absolute path
+        sys.path.insert(0, "/opt/csm")
+        from generator import load_csm_1b as original_load_csm_1b
+        from generator import Segment, Generator as OriginalGenerator
+        logger.info("Successfully imported CSM generator components from /opt/csm")
+        
 except ImportError as e:
     logger.warning(f"Could not import CSM generator: {e}")
     logger.warning("This is expected during development but should work in the container")
