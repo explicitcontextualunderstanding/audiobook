@@ -24,7 +24,7 @@ WORKDIR /workspace
 
 # Health check - runs inside the container to verify it's functioning properly
 HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-    CMD conda run -n tts python -c "import torch, moshi, torchao; print('Health check passed.')" || exit 1
+    CMD /opt/conda/bin/conda run -n tts python -c "import torch, moshi, torchao; print('Health check passed.')" || exit 1
 
-# Default command - uses conda environment
-CMD ["conda", "run", "-n", "tts", "--no-capture-output", "bash"]
+# Default command - uses conda environment with full path
+CMD ["/opt/conda/bin/conda", "run", "-n", "tts", "--no-capture-output", "bash"]
