@@ -15,9 +15,10 @@ WORKDIR /opt/build
 COPY docker/sesame-tts/requirements.txt ./
 COPY docker/sesame-tts/build.sh ./
 COPY docker/sesame-tts/utils/ ./utils/
+COPY docker/sesame-tts/entrypoint.sh ./
 
-# Make build script executable and run it
-RUN chmod +x ./build.sh && /bin/bash -c "set -e && ./build.sh"
+# Make scripts executable and run build
+RUN chmod +x ./build.sh ./entrypoint.sh && /bin/bash -c "set -e && ./build.sh"
 
 # Add final workdir, health check and default command
 WORKDIR /workspace
