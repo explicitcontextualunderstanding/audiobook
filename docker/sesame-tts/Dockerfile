@@ -45,3 +45,8 @@ RUN wget https://github.com/triton-inference-server/server/releases/download/v2.
     && tar -xvf tritonserver2.55.0-igpu.tar -C /opt/tritonserver --strip-components=1 \
     && rm tritonserver2.55.0-igpu.tar
 ENV PATH="/opt/tritonserver/bin:${PATH}"
+
+# For maximum reproducibility, generator.py and models.py from the CSM repo are vendored in docker/sesame-tts/utils/.
+# If you need to update these files, do so manually and commit them to version control.
+COPY docker/sesame-tts/utils/generator.py /opt/utils/generator.py
+COPY docker/sesame-tts/utils/models.py /opt/utils/models.py
