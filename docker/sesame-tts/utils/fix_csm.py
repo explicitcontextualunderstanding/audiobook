@@ -8,6 +8,7 @@ import sys
 import logging
 import importlib.util
 import traceback
+import time
 
 # Configure logging
 logging.basicConfig(
@@ -66,18 +67,31 @@ if len(sys.argv) > 1:
     
     # Test loading the model
     try:
-        import torch
+        # Import torch and torchaudio here to ensure they're available
+        try:
+            import torch
+            import torchaudio
+        except ImportError as e:
+            logger.error(f"❌ Error importing torch/torchaudio: {e}")
+            logger.error("Make sure PyTorch and torchaudio are installed correctly for your system")
+            sys.exit(1)
+        
         logger.info("Loading CSM model...")
-        start_time = import_module_from_file.__globals__.get('time', None)
-        if start_time:
-            start = start_time.time()
+        start = time.time()
         
-        generator = load_csm_1b(model_path=model_path, device="cuda")
+        # Check if CUDA is available and use it if possible, otherwise fall back to CPU
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        logger.info(f"Using device: {device}")
         
-        if start_time:
-            logger.info(f"✓ Model loaded successfully in {time.time() - start:.2f} seconds")
-        else:
-            logger.info("✓ Model loaded successfully")
+        # For Jetson devices, verify CUDA is working correctly
+        if device == "cuda":
+            logger.info(f"CUDA devices available: {torch.cuda.device_count()}")
+            logger.info(f"Current CUDA device: {torch.cuda.current_device()}")
+            logger.info(f"CUDA device name: {torch.cuda.get_device_name(0)}")
+        
+        generator = load_csm_1b(model_path=model_path, device=device)
+        
+        logger.info(f"✓ Model loaded successfully in {time.time() - start:.2f} seconds")
             
         # Generate a simple test
         text = "This is a test of the Sesame CSM text to speech system."
