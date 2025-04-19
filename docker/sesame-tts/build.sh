@@ -75,6 +75,10 @@ pip install --no-cache-dir --verbose -r requirements.txt
 # Install silentcipher for watermarking
 pip install --no-cache-dir "silentcipher @ git+https://github.com/SesameAILabs/silentcipher@master"
 
+# Force reinstall moshi and verify import
+pip install --force-reinstall --no-cache-dir "moshi<=0.2.2"
+python -c "import moshi; import moshi.models"
+
 echo "🔄 Downloading essential CSM files..."
 mkdir -p /opt/csm
 cd /opt/csm
