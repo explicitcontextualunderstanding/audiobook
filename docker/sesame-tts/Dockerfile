@@ -15,6 +15,7 @@ WORKDIR /opt/build
 COPY docker/sesame-tts/requirements.txt ./
 COPY docker/sesame-tts/build.sh ./
 COPY docker/sesame-tts/utils/ ./utils/
+COPY docker/sesame-tts/utils/ /opt/utils/
 COPY docker/sesame-tts/entrypoint.sh ./
 
 # Make scripts executable and run build
