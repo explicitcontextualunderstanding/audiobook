@@ -58,24 +58,19 @@ def main():
             logger.error(f"❌ Failed to import moshi: {e}")
             logger.info("Continuing without moshi import verification...")
         
-        # Verify we can import necessary modules for CSM
-        try:
-            sys.path.append('/opt/csm')
-            from audiobook_generator import load_csm_1b, Segment
-            logger.info("✓ Successfully imported CSM generator modules")
-        except ImportError as e:
-            logger.error(f"❌ Failed to import CSM generator modules: {e}")
-            sys.exit(1)
-        
+        # Import CSMModel and CSMConfig for loading
+        from csm import CSMModel, CSMConfig
+        logger.info("✓ Successfully imported CSMModel and CSMConfig")
+
         # Start timer for model loading
         start_time = time.time()
         logger.info(f"Loading CSM model from {args.model_path}...")
+        
+        # Load model via HF‐style API with config
         try:
-            # old (fails): result = load_csm_1b(device="cuda")
-            # new:
-            config = CSMConfig.from_pretrained(args.model_path)
-            model  = CSMModel.from_pretrained(args.model_path, config=config).to("cuda")
-            logger.info("✓ Model loaded successfully")
+            config    = CSMConfig.from_pretrained(args.model_path)
+            generator = CSMModel.from_pretrained(args.model_path, config=config).to("cuda")
+            logger.info(f"✓ Model loaded successfully in {time.time() - start_time:.2f} seconds")
         except Exception as e:
             logger.error(f"❌ Error loading CSM model: {e}")
             logger.error("Please check your model path and that all dependencies are installed correctly.")
