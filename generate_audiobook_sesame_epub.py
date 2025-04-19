@@ -24,27 +24,24 @@ try:
 except LookupError:
     nltk.download('punkt')
 
-def extract_text_from_epub(epub_path):
-    """Extract text from an EPUB file."""
-    print(f"Extracting text from {epub_path}...")
-    
+def extract_chapters_from_epub(epub_path):
+    """Extract chapters from an EPUB file as a list of (title, text) tuples."""
+    print(f"Extracting chapters from {epub_path}...")
     book = epub.read_epub(epub_path)
-    text = ""
-    
-    for item in tqdm(list(book.get_items_of_type(ebooklib.ITEM_DOCUMENT)), desc="Processing chapters"):
-        # Get content
+    chapters = []
+    for i, item in enumerate(tqdm(list(book.get_items_of_type(ebooklib.ITEM_DOCUMENT)), desc="Processing chapters")):
         content = item.get_content().decode('utf-8')
-        
-        # Use BeautifulSoup to parse HTML and extract text
         soup = BeautifulSoup(content, 'html.parser')
+        # Try to find a chapter title
+        title_tag = soup.find(['h1', 'h2', 'h3', 'h4'])
+        title = title_tag.get_text().strip() if title_tag else f"Chapter {i+1}"
         chapter_text = soup.get_text()
-        
-        # Clean the text
         chapter_text = re.sub(r'\s+', ' ', chapter_text).strip()
-        
-        text += chapter_text + "\n\n"
-    
-    return text
+        # Only add chapters with meaningful content
+        if len(chapter_text) > 50:
+            chapters.append((title, chapter_text))
+    print(f"Extracted {len(chapters)} chapters from EPUB.")
+    return chapters
 
 def preprocess_text(text, max_chunk_size=1000):
     """Clean and split text into manageable chunks."""
@@ -107,66 +104,53 @@ def combine_audio_files(audio_files, output_path):
     print(f"Audiobook saved to {output_path}")
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate an audiobook from an EPUB using Sesame CSM")
+    parser = argparse.ArgumentParser(description="Generate per-chapter audio from an EPUB using Sesame CSM")
     parser.add_argument("--epub", required=True, help="Path to the EPUB file")
-    parser.add_argument("--output", default="audiobook_sesame.mp3", help="Output audiobook file path")
-    parser.add_argument("--temp_dir", default="temp_audio_sesame", help="Directory for temporary audio files")
+    parser.add_argument("--output_dir", default="audiobook_chapters_sesame", help="Output directory for chapter audio files")
     parser.add_argument("--chunk_size", type=int, default=1000, help="Maximum characters per chunk")
     args = parser.parse_args()
-    
-    # Create temporary directory
-    os.makedirs(args.temp_dir, exist_ok=True)
-    
-    # Extract and preprocess text
-    text = extract_text_from_epub(args.epub)
-    chunks = preprocess_text(text, args.chunk_size)
-    
+
+    os.makedirs(args.output_dir, exist_ok=True)
+
+    # Extract chapters
+    chapters = extract_chapters_from_epub(args.epub)
+
     # Load CSM model
     print("Loading Sesame CSM model...")
     try:
-        # Try to use enhanced audiobook generator first
         try:
             from audiobook_generator import load_csm_1b, Segment
             print("Using enhanced audiobook generator with error handling")
         except ImportError:
-            # Fall back to original if needed
             from generator import load_csm_1b, Segment
             print("Using original CSM generator")
-            
         model = load_csm_1b("/models/sesame-csm-1b", device="cuda")
-        model = model.half()  # Use half precision to save memory
+        model = model.half()
     except Exception as e:
         print(f"Error loading CSM model: {e}")
         sys.exit(1)
-    
-    # Process each chunk
-    print(f"Processing {len(chunks)} text segments...")
-    audio_files = []
-    
-    for i, chunk in enumerate(tqdm(chunks, desc="Generating audio")):
-        output_path = os.path.join(args.temp_dir, f"chunk_{i:04d}.mp3")
-        
-        # Skip if already processed
-        if os.path.exists(output_path):
-            print(f"Skipping chunk {i} - already processed")
-            audio_files.append(output_path)
-            continue
-        
-        # Generate audio
-        success = generate_audio(model, chunk, output_path)
-        if success:
-            audio_files.append(output_path)
-            
-        # Take a short break every 5 chunks to prevent overheating
-        if i % 5 == 0 and i > 0:
-            print("Taking a short break to prevent overheating...")
-            time.sleep(10)
-            torch.cuda.empty_cache()
-    
-    # Combine audio files
-    combine_audio_files(audio_files, args.output)
-    
-    print("Audiobook generation complete!")
+
+    # Generate audio for each chapter
+    for idx, (title, chapter_text) in enumerate(chapters, 1):
+        print(f"Processing chapter {idx}: {title}")
+        # Split chapter into chunks
+        chunks = preprocess_text(chapter_text, args.chunk_size)
+        audio_files = []
+        for i, chunk in enumerate(chunks):
+            chunk_path = os.path.join(args.output_dir, f"chapter_{idx:02d}_chunk_{i:03d}.mp3")
+            if os.path.exists(chunk_path):
+                print(f"Skipping chunk {i} of chapter {idx} - already processed")
+                audio_files.append(chunk_path)
+                continue
+            success = generate_audio(model, chunk, chunk_path)
+            if success:
+                audio_files.append(chunk_path)
+        # Combine all chunk files for this chapter
+        chapter_output = os.path.join(args.output_dir, f"chapter_{idx:02d}_{re.sub(r'[^\w\s-]', '', title).strip().replace(' ', '_')}.mp3")
+        combine_audio_files(audio_files, chapter_output)
+        print(f"Chapter {idx} audio saved to {chapter_output}")
+
+    print("Per-chapter audiobook generation complete!")
 
 if __name__ == "__main__":
     main()
