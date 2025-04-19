@@ -210,7 +210,7 @@ def main(args):
     print("Using device: {}".format(device))
     try:
         # Load using the new function, passing the model path
-        generator = load_csm_1b(model_path=args.model_path, device=device)
+        generator = load_csm_1b(args.model_path, device=device)
         print("Model loaded successfully. Sample rate: {}".format(generator.sample_rate))
     except Exception as e:
         print("Error loading model: {}".format(e))

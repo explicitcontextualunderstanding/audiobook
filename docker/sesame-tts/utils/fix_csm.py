@@ -89,7 +89,7 @@ if len(sys.argv) > 1:
             logger.info(f"Current CUDA device: {torch.cuda.current_device()}")
             logger.info(f"CUDA device name: {torch.cuda.get_device_name(0)}")
         
-        generator = load_csm_1b(model_path=model_path, device=device)
+        generator = load_csm_1b(args.model_path, device=device)
         
         logger.info(f"✓ Model loaded successfully in {time.time() - start:.2f} seconds")
             

@@ -133,7 +133,7 @@ def main():
             from generator import load_csm_1b, Segment
             print("Using original CSM generator")
             
-        model = load_csm_1b(device="cuda")
+        model = load_csm_1b("/models/sesame-csm-1b", device="cuda")
         model = model.half()  # Use half precision to save memory
     except Exception as e:
         print(f"Error loading CSM model: {e}")
