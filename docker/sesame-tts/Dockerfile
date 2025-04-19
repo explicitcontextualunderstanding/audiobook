@@ -38,3 +38,10 @@ ENTRYPOINT ["/entrypoint.sh"]
 
 # Default command - uses conda environment with full path
 CMD ["/opt/conda/bin/conda", "run", "-n", "tts", "--no-capture-output", "bash"]
+
+# Install Triton Inference Server for JetPack 6.2/Orin
+RUN wget https://github.com/triton-inference-server/server/releases/download/v2.55.0/tritonserver2.55.0-igpu.tar \
+    && mkdir -p /opt/tritonserver \
+    && tar -xvf tritonserver2.55.0-igpu.tar -C /opt/tritonserver --strip-components=1 \
+    && rm tritonserver2.55.0-igpu.tar
+ENV PATH="/opt/tritonserver/bin:${PATH}"
