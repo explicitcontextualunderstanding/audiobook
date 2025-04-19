@@ -48,5 +48,12 @@ ENV PATH="/opt/tritonserver/bin:${PATH}"
 
 # For maximum reproducibility, generator.py and models.py from the CSM repo are vendored in docker/sesame-tts/utils/.
 # If you need to update these files, do so manually and commit them to version control.
-COPY docker/sesame-tts/utils/generator.py /opt/utils/generator.py
-COPY docker/sesame-tts/utils/models.py /opt/utils/models.py
+# Remove the two COPY lines and replace with a fetch step
+- COPY docker/sesame-tts/utils/generator.py /opt/utils/generator.py
+- COPY docker/sesame-tts/utils/models.py    /opt/utils/models.py
+
+# Fetch the latest CSM utility files directly from upstream
+RUN wget https://raw.githubusercontent.com/SesameAILabs/csm/main/generator.py \
+      -O /opt/utils/generator.py && \
+    wget https://raw.githubusercontent.com/SesameAILabs/csm/main/models.py \
+      -O /opt/utils/models.py
