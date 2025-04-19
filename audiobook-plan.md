@@ -283,6 +283,39 @@ python -c "from huggingface_hub import snapshot_download; snapshot_download(repo
 cd ..
 ```
 
+### 4.2.1 Download Required CSM Source Files (generator.py and models.py)
+
+> **Important:** The Sesame CSM model requires two core Python source files: `generator.py` and `models.py`. These files contain the main logic for model loading and inference. They are not included in this repository by default and must be obtained from the official Sesame CSM repository.
+
+#### Steps to Download and Place the Files
+
+1. **Download the files from the official repository:**
+   - Visit: https://github.com/SesameAILabs/csm
+   - Download `generator.py` and `models.py` from the root of that repository.
+
+2. **Place the files in your project:**
+   - For Docker-based usage, copy both files into the following directory in your project:
+     ```
+     docker/sesame-tts/utils/
+     ```
+   - For local (venv) usage, place them in the same directory as your audiobook scripts, or ensure they are on your `PYTHONPATH`.
+
+3. **Why is this needed?**
+   - These files implement the CSM model's core logic and are required for both the Docker container and local Python scripts to function.
+   - If these files are missing, you will encounter import errors or runtime failures when running any CSM-based scripts.
+
+4. **(Optional) Automate with a script:**
+   - You can automate this step with a shell command:
+     ```bash
+     # From the root of your project
+     wget https://raw.githubusercontent.com/SesameAILabs/csm/main/generator.py -O docker/sesame-tts/utils/generator.py
+     wget https://raw.githubusercontent.com/SesameAILabs/csm/main/models.py -O docker/sesame-tts/utils/models.py
+     ```
+
+> **Note:** Always check for updates to these files in the upstream repository if you encounter issues or after a new CSM release.
+
+---
+
 ### 4.3 Using the Sesame Audiobook Script
 
 ```bash
