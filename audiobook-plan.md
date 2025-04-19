@@ -282,7 +282,7 @@ python -c "from huggingface_hub import snapshot_download; snapshot_download(repo
 # Go back to project directory
 cd ..
 ```
-
+cal
 ### 4.2.1 Download Required CSM Source Files (generator.py and models.py)
 
 > **Important:** The Sesame CSM model requires two core Python source files: `generator.py` and `models.py`. These files contain the main logic for model loading and inference. They are not included in this repository by default and must be obtained from the official Sesame CSM repository.
