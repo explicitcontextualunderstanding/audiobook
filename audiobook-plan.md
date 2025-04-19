@@ -542,3 +542,63 @@ If you encounter "No space left on device" errors during `git pull`, Docker buil
 5.  **Reboot (Optional):** Sometimes a reboot can clear temporary files held by running processes.
 
 After freeing up space using these methods, check `df -h /` again. If usage is well below 100% (e.g., < 90%), you should be able to retry the operation that failed (e.g., `git pull`, `docker build`).
+
+---
+
+## VI. Planned Improvements for Dockerfile and Build System
+
+Based on best practices from the jetson-containers framework, the following improvements are planned for the Dockerfile and related build files:
+
+1. **Pin Python and System Dependencies**
+   - Ensure all Python dependencies in requirements.txt are version-pinned.
+   - Pin system package versions in build scripts where possible.
+
+2. **Leverage Jetson AI Lab PyPI Mirror**
+   - Configure pip to prioritize pre-built wheels from https://pypi.jetson-ai-lab.dev/simple for faster, more reliable installs.
+
+3. **Minimize Dockerfile Complexity**
+   - Move installation logic into build.sh, keeping the Dockerfile minimal.
+
+4. **Efficient Layer Usage**
+   - Group related RUN commands to reduce Docker layers and improve build caching.
+
+5. **Resource Management for Compilation**
+   - Limit parallel jobs during source builds to avoid exhausting Jetson resources.
+
+6. **Cleanup After Build**
+   - Add cleanup steps (e.g., apt-get clean, rm -rf /var/lib/apt/lists/*, rm -rf /tmp/*) to reduce image size.
+
+7. **Architecture Awareness**
+   - Ensure all build steps and dependencies are compatible with aarch64/Jetson.
+
+8. **Test Script**
+   - Provide a robust test.sh that verifies core container functionality (e.g., import key modules, run a minimal TTS inference).
+
+9. **Documentation**
+   - Maintain docs.md with usage examples, environment variable explanations, and troubleshooting tips.
+
+10. **Configurable Build Arguments**
+    - Use build_args in config.py and Dockerfile for easy switching of base images, dependency versions, or source URLs.
+
+11. **Healthcheck**
+    - Ensure the Dockerfile HEALTHCHECK is meaningful and tests the actual runtime environment.
+
+12. **Default Command and Entrypoint**
+    - Clearly define ENTRYPOINT and CMD for both interactive and production use cases.
+
+13. **Model and Data Volume Mounts**
+    - Document and, if possible, automate the mounting of model and data directories for reproducible runs.
+
+14. **Variant Support**
+    - If supporting multiple JetPack/CUDA versions, use config.py to define variants and select the appropriate base image and dependencies.
+
+15. **Error Handling**
+    - Use set -e and set -o pipefail in build scripts for robust error handling.
+
+16. **Optional: Triton Integration**
+    - If using Triton, provide a run.sh or docs.md example for launching and interacting with the inference server.
+
+17. **Optional: Environment Variables**
+    - Document and, if needed, set environment variables for CUDA, model paths, and other runtime requirements in entrypoint.sh or Dockerfile.
+
+These improvements will help make the container more robust, reproducible, and user-friendly for audiobook generation on Jetson devices.
