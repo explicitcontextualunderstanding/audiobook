@@ -46,14 +46,9 @@ RUN wget https://github.com/triton-inference-server/server/releases/download/v2.
     && rm tritonserver2.55.0-igpu.tar
 ENV PATH="/opt/tritonserver/bin:${PATH}"
 
-# For maximum reproducibility, generator.py and models.py from the CSM repo are vendored in docker/sesame-tts/utils/.
-# If you need to update these files, do so manually and commit them to version control.
-# Remove the two COPY lines and replace with a fetch step
-- COPY docker/sesame-tts/utils/generator.py /opt/utils/generator.py
-- COPY docker/sesame-tts/utils/models.py    /opt/utils/models.py
-
-# Fetch the latest CSM utility files directly from upstream
-RUN wget https://raw.githubusercontent.com/SesameAILabs/csm/main/generator.py \
-      -O /opt/utils/generator.py && \
-    wget https://raw.githubusercontent.com/SesameAILabs/csm/main/models.py \
-      -O /opt/utils/models.py
+# Shallow‑clone Sesame CSM repo, copy only the two utils, then drop the git data
+RUN rm -rf /opt/utils/csm && \
+    git clone --depth 1 https://github.com/SesameAILabs/csm.git /opt/utils/csm && \
+    cp /opt/utils/csm/generator.py /opt/utils/ && \
+    cp /opt/utils/csm/models.py    /opt/utils/ && \
+    rm -rf /opt/utils/csm/.git
