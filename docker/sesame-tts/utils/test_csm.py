@@ -11,6 +11,8 @@ import torchaudio
 import time
 import logging
 import argparse
+# add CSMConfig import
+from csm import CSMModel, CSMConfig  
 
 # Configure logging
 logging.basicConfig(
@@ -68,19 +70,12 @@ def main():
         # Start timer for model loading
         start_time = time.time()
         logger.info(f"Loading CSM model from {args.model_path}...")
-        
-        # Load the model
         try:
-            # Handle both possible return types (single generator or tuple)
-            result = load_csm_1b(device="cuda")
-            
-            # If it's a tuple, extract the generator
-            if isinstance(result, tuple) and len(result) >= 1:
-                generator = result[0]
-            else:
-                generator = result
-                
-            logger.info(f"✓ Model loaded successfully in {time.time() - start_time:.2f} seconds")
+            # old (fails): result = load_csm_1b(device="cuda")
+            # new:
+            config = CSMConfig.from_pretrained(args.model_path)
+            model  = CSMModel.from_pretrained(args.model_path, config=config).to("cuda")
+            logger.info("✓ Model loaded successfully")
         except Exception as e:
             logger.error(f"❌ Error loading CSM model: {e}")
             logger.error("Please check your model path and that all dependencies are installed correctly.")
