@@ -58,11 +58,17 @@ Available scripts:
   - /books/extract_chapters.py - Extract chapter information
 
 Example usage:
+  # Generate a single audiobook file (combined)
   python /books/generate_audiobook_sesame.py \
     --input /books/your_book.epub \
     --output /audiobook_data/audiobook_sesame.mp3 \
     --model_path /models/sesame-csm-1b \
     --voice_preset calm
+
+  # Generate per-chapter audio files from an EPUB
+  python /books/generate_audiobook_sesame_epub.py \
+    --epub /books/your_book.epub \
+    --output_dir /audiobook_data/audiobook_chapters_sesame
 
 Test the CSM installation by running:
   python /usr/local/bin/utils/test_csm.py /models/sesame-csm-1b
