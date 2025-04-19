@@ -495,7 +495,7 @@ If you encounter "No space left on device" errors during `git pull`, Docker buil
     sudo apt-get autoremove -y
     ```
 
-4.  **Check Large Directories/Files:** Find large files or directories in your home folder or common data locations.
+df 4.  **Check Large Directories/Files:** Find large files or directories in your home folder or common data locations.
     ```bash
     # Check size of key directories (adjust paths as needed)
     du -sh ~/.cache/huggingface
