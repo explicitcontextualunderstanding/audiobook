@@ -52,3 +52,6 @@ RUN rm -rf /opt/utils/csm && \
     cp /opt/utils/csm/generator.py /opt/utils/ && \
     cp /opt/utils/csm/models.py    /opt/utils/ && \
     rm -rf /opt/utils/csm/.git
+
+# Install Python Triton package so torchao kernels are available
+RUN /opt/conda/bin/conda run -n tts pip install triton
