@@ -33,6 +33,11 @@ env | grep -E 'CUDA|NVIDIA'
 source /opt/conda/etc/profile.d/conda.sh
 conda activate tts
 
+# Apply CSM import fix
+echo "Running CSM import fix..."
+python /opt/utils/fix_csm.py
+echo "CSM import fix applied."
+
 # Print welcome message
 cat << 'EOF'
 =====================================================
