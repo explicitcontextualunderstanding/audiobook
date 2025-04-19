@@ -369,9 +369,10 @@ Now you can proceed with building and running the container using this strategy.
 if ! sudo docker image inspect sesame-tts-jetson &>/dev/null; then
     echo "Building Sesame TTS Docker container for Jetson..."
     # Build using the modified Dockerfile (docker/sesame-tts/Dockerfile)
-    # NOTE: Uses dustynv/pytorch:2.6-r36.4.0-cu128-24.04, shallow‑clones the Sesame CSM repo,
-    # installs Triton server, fetches utility files, and adds the `triton` Python package
-    # automatically—no manual file copying needed.
+    # NOTE: Uses dustynv/pytorch:2.6-r36.4.0-cu128-24.04 base
+    # Performs a **shallow clone** of the Sesame CSM repo for `generator.py` & `models.py`
+    # Installs the **Triton Inference Server** binary (v2.55.0-igpu) for model serving
+    # Installs the **Python `triton`** package in the `tts` conda environment so TorchAO can JIT‑compile optimized kernels
     sudo docker build -t sesame-tts-jetson -f docker/sesame-tts/Dockerfile .
 fi
 
