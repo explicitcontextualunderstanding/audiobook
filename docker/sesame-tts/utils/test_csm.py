@@ -95,7 +95,7 @@ def main():
             logger.info(f"✓ Audio generation completed in {time.time() - start_time:.2f} seconds")
             logger.info(f"✓ Saved test audio to {output_path}")
             logger.info("✓ CSM is installed and working correctly!")
-         except Exception as e:
+        except Exception as e:
              logger.error(f"❌ Error during audio generation: {e}")
              import traceback
              logger.error(traceback.format_exc())
