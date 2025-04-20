@@ -77,25 +77,24 @@ def main():
         
         # Generate audio
         try:
-             # Modified to use a simpler generation approach to avoid torchtune shape issues
-             logger.info("Using a simpler generation approach...")
-             
-             # Try a basic generation without segments
-             audio = generator.generate(
-                 text=test_text,
-                 speaker=1,
-                 max_audio_length_ms=5000,  # 5 seconds max
-                 temperature=0.9,
-                 topk=50
-             )
-             
-             # Save output
-             output_path = os.path.join(os.getcwd(), args.output)
-             torchaudio.save(output_path, audio.unsqueeze(0).cpu(), generator.sample_rate)
-             
-             logger.info(f"✓ Audio generation completed in {time.time() - start_time:.2f} seconds")
-             logger.info(f"✓ Saved test audio to {output_path}")
-             logger.info("✓ CSM is installed and working correctly!")
+            # Modified to use a simpler generation approach to avoid torchtune shape issues
+            logger.info("Using a simpler generation approach...")
+            # Try a basic generation without segments
+            audio = generator.generate(
+                text=test_text,
+                speaker=1,
+                max_audio_length_ms=5000,  # 5 seconds max
+                temperature=0.9,
+                topk=50
+            )
+            
+            # Save output
+            output_path = os.path.join(os.getcwd(), args.output)
+            torchaudio.save(output_path, audio.unsqueeze(0).cpu(), generator.sample_rate)
+            
+            logger.info(f"✓ Audio generation completed in {time.time() - start_time:.2f} seconds")
+            logger.info(f"✓ Saved test audio to {output_path}")
+            logger.info("✓ CSM is installed and working correctly!")
          except Exception as e:
              logger.error(f"❌ Error during audio generation: {e}")
              import traceback
