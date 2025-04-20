@@ -8,12 +8,12 @@ The fastest way to get started is to use the quickstart script:
 
 ```bash
 # Make the script executable
-chmod +x quickstart.sh
+chmod +x scripts/quickstart.sh
 
 # Run with your book file (ePub recommended)
-./quickstart.sh /path/to/your/book.epub piper  # For Piper TTS (faster)
+./scripts/quickstart.sh /path/to/your/book.epub piper  # For Piper TTS (faster)
 # or
-./quickstart.sh /path/to/your/book.epub sesame # For Sesame CSM (higher quality)
+./scripts/quickstart.sh /path/to/your/book.epub sesame # For Sesame CSM (higher quality)
 ```
 
 ## Available Scripts
