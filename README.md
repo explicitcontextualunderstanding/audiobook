@@ -18,9 +18,10 @@ chmod +x scripts/quickstart.sh
 
 ## Available Scripts
 
-- `generate_audiobook_piper.py` - Script for generating audiobooks using Piper TTS
-- `generate_audiobook_sesame.py` - Script for generating audiobooks using Sesame CSM
-- `quickstart.sh` - Helper script to set up the environment and start the generation process
+- `scripts/build_container.sh` – Build (and optionally push) the Docker container image.
+- `scripts/quickstart.sh` – Helper script to set up the environment and start generation.
+- `generate_audiobook_piper.py` – Script for generating audiobooks using Piper TTS
+- `generate_audiobook_sesame.py` – Script for generating audiobooks using Sesame CSM
 
 ## Comprehensive Documentation
 
