@@ -75,8 +75,8 @@ def main():
         start_time = time.time()
         test_text = "This is a test of the Sesame CSM text to speech system."
         
-         # Generate audio
-         try:
+        # Generate audio
+        try:
              # Modified to use a simpler generation approach to avoid torchtune shape issues
              logger.info("Using a simpler generation approach...")
              
