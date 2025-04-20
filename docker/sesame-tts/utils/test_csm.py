@@ -11,16 +11,10 @@ import time
 import logging
 import argparse
 
-# dynamic import: prefer HF package, else fallback to local utils under this folder
-try:
-    from csm import CSMModel, CSMConfig
-    use_hf = True
-except ImportError:
-    utils_dir = os.path.dirname(__file__)
-    sys.path.insert(0, utils_dir)
-    from generator import load_csm_1b, Segment
-    from models    import CSMConfig
-    use_hf = False
+# always use the local utils loader on Jetson
+sys.path.insert(0, os.path.dirname(__file__))
+from generator import load_csm_1b, Segment
+from models    import CSMConfig   # optional, not used below
 
 # Configure logging
 logging.basicConfig(
@@ -70,12 +64,9 @@ def main():
         start_time = time.time()
         logger.info(f"Loading CSM model from {args.model_path}...")
         try:
-            if use_hf:
-                config    = CSMConfig.from_pretrained(args.model_path)
-                generator = CSMModel.from_pretrained(args.model_path, config=config).to("cuda")
-            else:
-                result    = load_csm_1b(device="cuda")
-                generator = result[0] if isinstance(result, tuple) else result
+            # local loader → returns (generator, ...) or generator directly
+            result    = load_csm_1b(device="cuda")
+            generator = result[0] if isinstance(result, tuple) else result
             logger.info(f"✓ Model loaded successfully in {time.time() - start_time:.2f} seconds")
         except Exception as e:
             logger.error(f"❌ Error loading CSM model: {e}")
