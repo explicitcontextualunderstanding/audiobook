@@ -4,22 +4,23 @@ Test script for Sesame CSM
 This script tests if the CSM model can be loaded and used for generation.
 """
 
-import os
-import sys
+import os, sys
 import torch
 import torchaudio
 import time
 import logging
 import argparse
 
-# dynamic import: prefer installed csm package, else fallback to local utils
+# dynamic import: prefer HF package, else fallback to local utils under this folder
 try:
     from csm import CSMModel, CSMConfig
+    use_hf = True
 except ImportError:
     utils_dir = os.path.dirname(__file__)
     sys.path.insert(0, utils_dir)
-    from generator import CSMModel
+    from generator import load_csm_1b, Segment
     from models    import CSMConfig
+    use_hf = False
 
 # Configure logging
 logging.basicConfig(
@@ -68,15 +69,16 @@ def main():
         # Start timer for model loading
         start_time = time.time()
         logger.info(f"Loading CSM model from {args.model_path}...")
-        
-        # Load model via API with config
         try:
-            config    = CSMConfig.from_pretrained(args.model_path)
-            generator = CSMModel.from_pretrained(args.model_path, config=config).to("cuda")
+            if use_hf:
+                config    = CSMConfig.from_pretrained(args.model_path)
+                generator = CSMModel.from_pretrained(args.model_path, config=config).to("cuda")
+            else:
+                result    = load_csm_1b(device="cuda")
+                generator = result[0] if isinstance(result, tuple) else result
             logger.info(f"✓ Model loaded successfully in {time.time() - start_time:.2f} seconds")
         except Exception as e:
             logger.error(f"❌ Error loading CSM model: {e}")
-            logger.error("Please check your model path and that all dependencies are installed correctly.")
             sys.exit(1)
         
         # Generate a small test audio
