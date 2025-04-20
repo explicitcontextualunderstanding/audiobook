@@ -12,26 +12,35 @@ from tqdm import tqdm
 from pydub import AudioSegment
 import torch
 import torchaudio
-# Add /opt/csm to path to help find generator if editable install needs it at runtime
+
+# Add paths to help find the audiobook_generator module
 sys.path.insert(0, '/opt/csm')
+# Also add the docker utils path which contains our custom modules
+if os.path.exists('/opt/utils'):
+    sys.path.insert(0, '/opt/utils')
+elif os.path.exists(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'docker/sesame-tts/utils')):
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'docker/sesame-tts/utils'))
 
 try:
-    # Import according to new usage
+    # Import from our custom audiobook_generator module
+    from audiobook_generator import load_csm_1b, Segment
+    print("Successfully imported audiobook_generator module")
+except ModuleNotFoundError as e:
+    print(f"Error importing audiobook_generator: {e}")
+    print("Attempting fallback import path...")
     try:
-        from audiobook_generator import load_csm_1b, Segment
-    except ModuleNotFoundError:
-        print("Error: 'audiobook_generator' module not found. Ensure it is installed or its path is added to sys.path.")
+        # Fallback to direct import from generator if running in original container
+        from generator import load_csm_1b, Segment
+        print("Successfully imported from generator module")
+    except ModuleNotFoundError as e2:
+        print(f"Failed fallback import: {e2}")
+        print("PYTHONPATH:", os.environ.get('PYTHONPATH'))
+        print("sys.path:", sys.path)
+        print("Current directory:", os.getcwd())
+        print("Directory contents:", os.listdir())
         sys.exit(1)
-except ImportError as e:
-    print("Failed to import from generator (ensure csm installed correctly).")
-    print("PYTHONPATH:", os.environ.get('PYTHONPATH'))
-    print("sys.path:", sys.path)
-    raise e
 
 # --- Helper Functions ---
-# Import necessary functions if they are defined elsewhere
-# from text_utils import extract_text_from_epub, extract_text_from_pdf, split_text # Example
-# Assuming these functions are defined in this file for now:
 import ebooklib
 from ebooklib import epub
 from bs4 import BeautifulSoup
@@ -39,11 +48,14 @@ from PyPDF2 import PdfReader
 import nltk
 try:
     nltk.data.find('tokenizers/punkt')
-except nltk.downloader.DownloadError:
-    print("NLTK 'punkt' tokenizer not found. Please ensure it was downloaded.")
-    # Attempt download if possible, or raise error
-    # nltk.download('punkt') # Might fail in restricted envs
-    sys.exit("Error: NLTK 'punkt' not available.")
+except (nltk.downloader.DownloadError, LookupError):
+    print("NLTK 'punkt' tokenizer not found. Attempting to download...")
+    try:
+        nltk.download('punkt')
+        print("Successfully downloaded NLTK punkt tokenizer")
+    except Exception as e:
+        print(f"Error downloading NLTK punkt: {e}")
+        sys.exit("Error: NLTK 'punkt' not available.")
 from nltk.tokenize import sent_tokenize
 
 def html_to_text(html_content):
@@ -129,6 +141,61 @@ def split_text(text, max_length=500, sentence_boundary=True):
     print("Split into {} chunks.".format(len(chunks)))
     return chunks
 
+def process_range(range_str, max_val):
+    """Process a range string like '1-5' and return a list of indices."""
+    if not range_str:
+        return list(range(max_val))  # All chunks
+    
+    try:
+        # Parse the range string (e.g., "1-5")
+        parts = range_str.split('-')
+        if len(parts) == 1:
+            # Single value
+            start = int(parts[0]) - 1  # Convert to 0-based index
+            end = start + 1
+        else:
+            # Range
+            start = int(parts[0]) - 1  # Convert to 0-based index
+            end = int(parts[1])
+        
+        # Validate range
+        if start < 0 or end > max_val or start >= end:
+            print(f"Warning: Invalid range {range_str} for {max_val} chunks. Using all chunks.")
+            return list(range(max_val))
+        
+        return list(range(start, end))
+    except ValueError:
+        print(f"Warning: Could not parse range string '{range_str}'. Using all chunks.")
+        return list(range(max_val))
+
+def find_voice_preset_file(model_path, voice_preset):
+    """Find the voice preset file in various possible locations."""
+    if not voice_preset:
+        return None
+    
+    # Define possible preset locations and extensions
+    extensions = ['.wav', '.mp3']
+    locations = [
+        model_path,
+        os.path.join(model_path, 'prompts'),
+        os.path.join(model_path, 'presets'),
+        os.path.join(model_path, 'voices'),
+    ]
+    
+    # Try with and without extension
+    preset_names = [voice_preset]
+    for ext in extensions:
+        preset_names.append(f"{voice_preset}{ext}")
+    
+    # Search all combinations
+    for location in locations:
+        if os.path.exists(location) and os.path.isdir(location):
+            for name in preset_names:
+                path = os.path.join(location, name)
+                if os.path.exists(path) and os.path.isfile(path):
+                    return path
+    
+    return None
 
 def synthesize_chunk(generator, text, voice_preset_wav, output_path, device):
     """Synthesizes audio for a text chunk using the generator."""
@@ -148,6 +215,7 @@ def synthesize_chunk(generator, text, voice_preset_wav, output_path, device):
                 # Create a Segment for context
                 # Use a placeholder text for the context segment
                 context = [Segment(text="Voice prompt.", speaker=speaker_id, audio=ref_wav.to(device))]
+                print(f"Using voice preset as context: {voice_preset_wav}")
             except Exception as load_e:
                 print("Warning: Could not load or process voice preset {}: {}".format(voice_preset_wav, load_e))
                 context = [] # Fallback to no context
@@ -182,23 +250,13 @@ def main(args):
     # Determine voice preset path (used for context)
     voice_preset_path = None
     if args.voice_preset:
-        voice_preset_filename = "{}.wav".format(args.voice_preset)
-        # Look in common locations relative to the model path
-        potential_paths = [
-            os.path.join(args.model_path, voice_preset_filename),
-            os.path.join(args.model_path, "prompts", voice_preset_filename)
-        ]
-        for path in potential_paths:
-            if os.path.exists(path):
-                voice_preset_path = path
-                break
+        voice_preset_path = find_voice_preset_file(args.model_path, args.voice_preset)
         if not voice_preset_path:
-            print("Warning: Could not find voice preset '{}' in model path '{}' or its 'prompts' subdirectory. Proceeding without voice preset context.".format(args.voice_preset, args.model_path))
+            print("Warning: Could not find voice preset '{}' in model path or its subdirectories. Proceeding without voice preset context.".format(args.voice_preset))
         else:
              print("Using voice preset for context: {}".format(voice_preset_path))
     else:
         print("No voice preset specified, using default voice.")
-
 
     # Create output directories
     temp_dir = args.temp_dir or os.path.join(os.path.dirname(args.output), "temp_audio_sesame")
@@ -237,22 +295,51 @@ def main(args):
 
     # --- Text Splitting ---
     text_chunks = split_text(full_text, max_length=args.chunk_length, sentence_boundary=True)
+    
+    # --- Process Chapter Range ---
+    if args.chapter_range:
+        chunk_indices = process_range(args.chapter_range, len(text_chunks))
+        selected_chunks = [text_chunks[i] for i in chunk_indices]
+        print(f"Processing {len(selected_chunks)} chunks from specified range: {args.chapter_range}")
+        text_chunks = selected_chunks
 
+    # --- Apply Memory Constraints ---
+    if args.memory_per_chunk > 0 and args.max_batch_size > 0:
+        # Split into batches to manage memory
+        max_chunks = args.max_batch_size
+        print(f"Processing in batches of maximum {max_chunks} chunks (memory per chunk: {args.memory_per_chunk}MB)")
+        batches = [text_chunks[i:i+max_chunks] for i in range(0, len(text_chunks), max_chunks)]
+    else:
+        # Process all at once
+        batches = [text_chunks]
+        
     # --- Audio Synthesis ---
     print("Starting audio synthesis...")
     audio_files = []
     start_time = time.time()
-    for i, chunk in enumerate(tqdm(text_chunks, desc="Synthesizing Chunks")):
-        chunk_filename = os.path.join(temp_dir, "chunk_{:04d}.wav".format(i))
-        if os.path.exists(chunk_filename) and os.path.getsize(chunk_filename) > 0:
+    
+    batch_count = len(batches)
+    for batch_idx, batch in enumerate(batches):
+        print(f"Processing batch {batch_idx+1}/{batch_count} ({len(batch)} chunks)")
+        
+        for i, chunk in enumerate(tqdm(batch, desc=f"Synthesizing Batch {batch_idx+1}")):
+            overall_idx = batch_idx * args.max_batch_size + i
+            chunk_filename = os.path.join(temp_dir, "chunk_{:04d}.wav".format(overall_idx))
+            
+            if os.path.exists(chunk_filename) and os.path.getsize(chunk_filename) > 0:
+                print(f"Chunk {overall_idx} already exists, skipping synthesis")
+                audio_files.append(chunk_filename)
+                continue
+
+            if not synthesize_chunk(generator, chunk, voice_preset_path, chunk_filename, device):
+                print("Warning: Failed to synthesize chunk {}. Skipping.".format(overall_idx))
+                continue # Skip this chunk
+
             audio_files.append(chunk_filename)
-            continue
-
-        if not synthesize_chunk(generator, chunk, voice_preset_path, chunk_filename, device):
-            print("Warning: Failed to synthesize chunk {}. Skipping.".format(i))
-            continue # Skip this chunk
-
-        audio_files.append(chunk_filename)
+        
+        # Clean up GPU memory between batches
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     if not audio_files:
         print("Error: No audio chunks were successfully synthesized.")
@@ -260,7 +347,6 @@ def main(args):
 
     end_time = time.time()
     print("Audio synthesis complete in {:.2f} seconds.".format(end_time - start_time))
-
 
     # --- Audio Concatenation ---
     print("Combining audio chunks...")
@@ -312,11 +398,13 @@ if __name__ == "__main__":
     parser.add_argument("--input", required=True, help="Path to the input EPUB or PDF file.")
     parser.add_argument("--output", required=True, help="Path to the output audio file (e.g., audiobook.mp3).")
     parser.add_argument("--model_path", required=True, help="Path to the directory containing the downloaded Sesame model files (used by load_csm_1b).")
-    # Voice preset is now used as context prompt
-    parser.add_argument("--voice_preset", default=None, help="Name of the voice preset WAV file (without extension, e.g., 'calm') located in the model directory or its 'prompts' subdirectory, used as context. If omitted, uses default voice.")
+    parser.add_argument("--voice_preset", default=None, help="Name of the voice preset to use (without extension, e.g., 'calm'). If omitted, uses default voice.")
     parser.add_argument("--chunk_length", type=int, default=500, help="Approximate maximum character length for text chunks (respects sentence boundaries).")
     parser.add_argument("--temp_dir", default=None, help="Directory to store temporary audio chunks. Defaults to 'temp_audio_sesame' next to the output file.")
     parser.add_argument("--keep_temp", action='store_true', help="Keep temporary audio chunk files after generation.")
+    parser.add_argument("--chapter_range", default=None, help="Range of chapters to process (e.g., '1-5')")
+    parser.add_argument("--memory_per_chunk", type=int, default=150, help="Estimated memory usage per chunk in MB.")
+    parser.add_argument("--max_batch_size", type=int, default=8, help="Maximum number of chunks to process in a single batch.")
 
     args = parser.parse_args()
     main(args)
