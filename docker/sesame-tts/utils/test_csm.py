@@ -11,8 +11,15 @@ import torchaudio
 import time
 import logging
 import argparse
-# add CSMConfig import
-from csm import CSMModel, CSMConfig  
+
+# dynamic import: prefer installed csm package, else fallback to local utils
+try:
+    from csm import CSMModel, CSMConfig
+except ImportError:
+    utils_dir = os.path.dirname(__file__)
+    sys.path.insert(0, utils_dir)
+    from generator import CSMModel
+    from models    import CSMConfig
 
 # Configure logging
 logging.basicConfig(
@@ -58,15 +65,11 @@ def main():
             logger.error(f"❌ Failed to import moshi: {e}")
             logger.info("Continuing without moshi import verification...")
         
-        # Import CSMModel and CSMConfig for loading
-        from csm import CSMModel, CSMConfig
-        logger.info("✓ Successfully imported CSMModel and CSMConfig")
-
         # Start timer for model loading
         start_time = time.time()
         logger.info(f"Loading CSM model from {args.model_path}...")
         
-        # Load model via HF‐style API with config
+        # Load model via API with config
         try:
             config    = CSMConfig.from_pretrained(args.model_path)
             generator = CSMModel.from_pretrained(args.model_path, config=config).to("cuda")
