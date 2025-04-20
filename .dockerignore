@@ -1,0 +1,53 @@
+# Git
+.git
+.gitignore
+
+# Python
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/.env
+**/.venv
+**/env/
+**/venv/
+**/ENV/
+**/env.bak/
+**/venv.bak/
+
+# Distribution / packaging
+**/dist
+**/build
+**/*.egg-info
+
+# Unit test / coverage reports
+**/htmlcov
+**/.coverage
+**/.coverage.*
+**/coverage.xml
+**/*.cover
+
+# Docker
+**/*.dockerfile
+**/Dockerfile*
+docker-compose.yml
+**/docker-compose.yml
+
+# Log files
+**/*.log
+
+# Generated files
+**/generated
+**/output
+**/logs
+**/temp
+**/tmp
+
+# Exclude everything in specific directories we don't need for building
+models/checkpoints/**
+audiobook_data/**
+books/**
+
+# Include necessary model directories
+!models/README.md
