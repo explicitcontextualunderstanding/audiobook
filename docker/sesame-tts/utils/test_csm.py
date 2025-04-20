@@ -13,12 +13,7 @@ import argparse
 
 # always use the local utils loader on Jetson
 sys.path.insert(0, os.path.dirname(__file__))
-from generator import load_csm_1b, Segment
-# Optional CSMConfig import; ignore if unavailable
-try:
-    from models import CSMConfig
-except ImportError:
-    CSMConfig = None
+from generator import load_csm_1b
 
 # Configure logging
 logging.basicConfig(
@@ -80,40 +75,32 @@ def main():
         start_time = time.time()
         test_text = "This is a test of the Sesame CSM text to speech system."
         
-        # Create a simple segment to use as context
-        segments = [Segment(
-            speaker=1,
-            text="Hello, world.",
-            audio=torch.zeros(generator.sample_rate).to("cuda")
-        )]
-        
-        # Generate audio
-        try:
-            # Modified to use a simpler generation approach to avoid torchtune shape issues
-            logger.info("Using a simpler generation approach...")
-            
-            # Try a basic generation without segments
-            audio = generator.generate(
-                text=test_text,
-                speaker=1,
-                # Removed the context=segments parameter
-                max_audio_length_ms=5000,  # 5 seconds max
-                temperature=0.9,
-                topk=50
-            )
-            
-            # Save output
-            output_path = os.path.join(os.getcwd(), args.output)
-            torchaudio.save(output_path, audio.unsqueeze(0).cpu(), generator.sample_rate)
-            
-            logger.info(f"✓ Audio generation completed in {time.time() - start_time:.2f} seconds")
-            logger.info(f"✓ Saved test audio to {output_path}")
-            logger.info("✓ CSM is installed and working correctly!")
-        except Exception as e:
-            logger.error(f"❌ Error during audio generation: {e}")
-            import traceback
-            logger.error(traceback.format_exc())
-            sys.exit(1)
+         # Generate audio
+         try:
+             # Modified to use a simpler generation approach to avoid torchtune shape issues
+             logger.info("Using a simpler generation approach...")
+             
+             # Try a basic generation without segments
+             audio = generator.generate(
+                 text=test_text,
+                 speaker=1,
+                 max_audio_length_ms=5000,  # 5 seconds max
+                 temperature=0.9,
+                 topk=50
+             )
+             
+             # Save output
+             output_path = os.path.join(os.getcwd(), args.output)
+             torchaudio.save(output_path, audio.unsqueeze(0).cpu(), generator.sample_rate)
+             
+             logger.info(f"✓ Audio generation completed in {time.time() - start_time:.2f} seconds")
+             logger.info(f"✓ Saved test audio to {output_path}")
+             logger.info("✓ CSM is installed and working correctly!")
+         except Exception as e:
+             logger.error(f"❌ Error during audio generation: {e}")
+             import traceback
+             logger.error(traceback.format_exc())
+             sys.exit(1)
         
     except Exception as e:
         logger.error(f"❌ Error: {str(e)}")
