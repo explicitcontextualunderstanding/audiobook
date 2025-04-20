@@ -14,7 +14,11 @@ import argparse
 # always use the local utils loader on Jetson
 sys.path.insert(0, os.path.dirname(__file__))
 from generator import load_csm_1b, Segment
-from models    import CSMConfig   # optional, not used below
+# Optional CSMConfig import; ignore if unavailable
+try:
+    from models import CSMConfig
+except ImportError:
+    CSMConfig = None
 
 # Configure logging
 logging.basicConfig(
@@ -64,8 +68,7 @@ def main():
         start_time = time.time()
         logger.info(f"Loading CSM model from {args.model_path}...")
         try:
-            # local loader → returns (generator, ...) or generator directly
-            result    = load_csm_1b(device="cuda")
+            result    = load_csm_1b(model_path=args.model_path, device="cuda")
             generator = result[0] if isinstance(result, tuple) else result
             logger.info(f"✓ Model loaded successfully in {time.time() - start_time:.2f} seconds")
         except Exception as e:
