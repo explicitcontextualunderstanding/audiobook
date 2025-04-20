@@ -1,40 +1,38 @@
-# Core PyTorch dependencies - will use pre-built wheels when possible
+# Core PyTorch
 torch==2.6.0
-torchvision
-torchaudio
+torchvision==0.17.0
+torchaudio==2.6.0
 
-# Hugging Face components with specific versions
+# Transformers & Tokenizers
 tokenizers==0.13.3
 transformers==4.31.0
 huggingface_hub==0.16.4
 accelerate==0.25.0
 
 # Audio processing
-soundfile
-pydub
+soundfile==0.12.1
+pydub==0.25.1
 sounddevice==0.5.0
 
-# Text processing
-ebooklib
-beautifulsoup4
-PyPDF2
-pdfminer.six
-nltk
+# Text extraction & NLP
+ebooklib==0.18.0
+beautifulsoup4==4.12.2
+PyPDF2==3.0.1
+pdfminer.six==20221105
+nltk==3.8.1
 
-# ML utilities
+# Utilities & optimizers
 einops==0.7.0
-sphn>=0.1.4
-rotary_embedding_torch
-vector_quantize_pytorch
-datasets
+sphn==0.1.4
+rotary_embedding_torch==0.2.5
+vector_quantize_pytorch==1.8.6
+datasets==2.16.1
+torchtune==0.3.0
+torchao==0.1.0
 
-# Optimization and AI
-torchtune<0.4.0
-torchao
+# TTS specifics
+moshi==0.2.2
 
-# Text-to-speech specific
-moshi<=0.2.2
-
-# System utilities
-tqdm
-psutil
+# System utils
+tqdm==4.66.1
+psutil==5.9.6
