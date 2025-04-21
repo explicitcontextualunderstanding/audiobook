@@ -53,7 +53,8 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DEFAULT_TIMEOUT=100 \
     CUDA_MODULE_LOADING=LAZY \
     TORCH_USE_CUDA_DSA=1 \
-    PATH="/opt/conda/bin:$PATH" # Ensure conda is in PATH
+    # Ensure conda is in PATH
+    PATH="/opt/conda/bin:$PATH"
 
 # Install only essential system dependencies in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
