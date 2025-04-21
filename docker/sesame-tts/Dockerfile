@@ -25,7 +25,7 @@ RUN mkdir -p ~/.config/pip && \
 # Ensure the target directory exists
 RUN mkdir -p /app
 # Copy the requirements file directly to the target path
-COPY ./requirements.in /app/requirements.in # Explicitly copy to full path
+COPY ./requirements.in /app/requirements.in
 
 # Set WORKDIR after copying the file
 WORKDIR /app
