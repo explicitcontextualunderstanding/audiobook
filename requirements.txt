@@ -1,22 +1,48 @@
+# Core ML Framework - Pinned to match base image/tested compatibility
 torch==2.2.0
 torchvision==0.17.0
 torchaudio==2.2.0
+
+# VQ library - Pinned due to previous einops dependency conflict resolution
 vector_quantize_pytorch==1.22.15
+
+# Tokenization library - Flexible version
 tokenizers>=0.13.3
+# Transformer models - Flexible version
 transformers>=4.31.0
+# Hugging Face Hub interaction - Flexible version
 huggingface_hub>=0.16.4
+# Training utilities - Flexible version
 accelerate>=0.25.0
+
+# Audio file handling - Flexible version
 soundfile>=0.12.1
+# Audio manipulation - Flexible version
 pydub>=0.25.1
+# Audio device interaction (may not be strictly needed in container) - Flexible version
 sounddevice>=0.5.0
+
+# Ebook parsing - Flexible version
 ebooklib>=0.18.0
+# HTML/XML parsing - Flexible version
 beautifulsoup4>=4.12.2
+# PDF handling - Flexible version
 PyPDF2>=3.0.1
+# PDF text extraction - Flexible version
 pdfminer.six>=20221105
+# Natural language processing toolkit (for sentence splitting) - Flexible version
 nltk>=3.8.1
+
+# Tensor operations library - Minimum version set to satisfy vector_quantize_pytorch
 einops>=0.8.0
+
+# PyTorch Acceleration & Optimization - Pinned for specific CSM features/compatibility
 torchao==0.1.0
+# PyTorch Fine-tuning library - Pinned for specific CSM features/compatibility
 torchtune==0.3.0
+# Model serialization (Sesame specific?) - Pinned for specific CSM features/compatibility
 moshi==0.2.2
+# Watermarking/Encryption (Sesame specific) - Pinned to specific repo version
 silentcipher @ git+https://github.com/SesameAILabs/silentcipher@v1.0.2
+# Triton Inference Server client/utils (needed for torchao kernels?) - No specific version pinned yet
 triton
