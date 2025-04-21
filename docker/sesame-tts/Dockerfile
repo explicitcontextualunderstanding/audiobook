@@ -53,8 +53,7 @@ RUN conda run -n tts /bin/bash -c '\
 
 # Ensure the target directory exists and copy requirements.in
 RUN mkdir -p /app
-COPY ./requirements.in /app/requirements.in # Make sure your input file is named requirements.in
-
+COPY ./requirements.in /app/requirements.in
 WORKDIR /app
 
 # Run pip-compile using the Python from the 'tts' conda environment
