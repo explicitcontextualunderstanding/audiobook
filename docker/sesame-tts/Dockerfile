@@ -21,7 +21,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 # Install only essential system dependencies in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg libsndfile1 wget curl git ca-certificates \
+    wget curl git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure pip for faster installations
@@ -32,12 +32,22 @@ RUN mkdir -p ~/.config/pip && \
     echo "timeout = 60" >> ~/.config/pip/pip.conf && \
     echo "retries = 3" >> ~/.config/pip/pip.conf
 
-# Create and configure conda environment in a single layer
-RUN conda config --set channel_priority flexible && \
-    conda config --set pip_interop_enabled True && \
-    conda config --add channels conda-forge && \
-    conda create -y -n tts python=3.10 pip setuptools wheel && \
-    conda clean -ya
+# Install Miniconda and set up the environment
+RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -o Miniconda3.sh && \
+    bash Miniconda3.sh -b -p /opt/conda && \
+    rm Miniconda3.sh && \
+    /opt/conda/bin/conda config --set channel_priority flexible && \
+    /opt/conda/bin/conda config --set pip_interop_enabled True && \
+    /opt/conda/bin/conda config --add channels conda-forge && \
+    /opt/conda/bin/conda create -y -n tts python=3.10 pip setuptools wheel && \
+    /opt/conda/bin/conda clean -ya
+
+# Ensure Conda is available in PATH
+ENV PATH="/opt/conda/bin:$PATH"
+
+# Install ffmpeg separately if not found in Conda
+RUN /opt/conda/bin/conda install -n tts -c conda-forge ffmpeg || \
+    apt-get update && apt-get install -y ffmpeg && apt-get clean
 
 # Copy requirements files
 COPY docker/sesame-tts/requirements.txt /tmp/requirements.txt
