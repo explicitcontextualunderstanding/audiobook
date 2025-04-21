@@ -48,7 +48,6 @@ export PATH="$CONDA_DIR/bin:$PATH"
 
 echo "🌐 Creating optimized conda env with Python 3.10..."
 conda create -y -n tts python=3.10 \
-    ffmpeg='*=*_conda' \
     pip setuptools wheel
 conda clean -ya
 
