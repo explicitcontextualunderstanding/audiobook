@@ -14,4 +14,9 @@ beautifulsoup4==4.12.2
 PyPDF2==3.0.1
 pdfminer.six==20221105
 nltk==3.8.1
-einops==0.7.0
+einops>=0.8.0
+torchao==0.1.0
+torchtune==0.3.0
+moshi==0.2.2
+silentcipher @ git+https://github.com/SesameAILabs/silentcipher@v1.0.2
+triton
