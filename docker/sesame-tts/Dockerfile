@@ -21,7 +21,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 # Install only essential system dependencies in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget curl git ca-certificates \
+    wget curl git ca-certificates build-essential python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure pip for faster installations
@@ -62,35 +62,29 @@ RUN chmod +x /opt/install_deps.sh && /opt/install_deps.sh
 # Copy requirements files
 COPY requirements.txt /tmp/requirements.txt
 
-# Install Python dependencies
+# Install Python dependencies from the updated requirements file
+# Assumes requirements.txt now includes:
+# - einops>=0.8.0
+# - vector_quantize_pytorch==1.22.15
+# - torchao==0.1.0
+# - torchtune==0.3.0
+# - moshi==0.2.2
+# - silentcipher @ git+https://github.com/SesameAILabs/silentcipher@v1.0.2
+# - triton
+# - All original requirements
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
-    pip install --no-cache-dir --prefer-binary \
+    echo "Installing all Python dependencies from requirements.txt..." && \
+    pip install --no-cache-dir \
     --index-url https://pypi.jetson-ai-lab.dev/simple \
     --extra-index-url https://pypi.ngc.nvidia.com \
     --extra-index-url https://pypi.org/simple \
     -r /tmp/requirements.txt
 
-# Install specialized dependencies in a separate layer
-SHELL ["/bin/bash", "-c"]
-RUN source /opt/conda/bin/activate tts && \
-    # Install specialized packages separately
-    pip install --no-cache-dir --prefer-binary \
-    "torchao==0.1.0" "torchtune==0.3.0" && \
-    # Force reinstall moshi to ensure correct version
-    pip install --force-reinstall --no-cache-dir --prefer-binary \
-    "moshi==0.2.2" && \
-    # Special dependencies
-    pip install --no-cache-dir --prefer-binary \
-    "silentcipher @ git+https://github.com/SesameAILabs/silentcipher@v1.0.2" && \
-    # Install triton for torchao kernels
-    pip install --no-cache-dir --prefer-binary \
-    triton
-
 # Verify critical imports to ensure dependencies are correctly installed
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
-    python -c "import torch; print(f'PyTorch version: {torch.__version__}'); import torchao; import torchtune; import moshi; print('All imports successful')"
+    python -c "import torch; print(f'PyTorch version: {torch.__version__}'); import torchao; import torchtune; import moshi; import einops; import vector_quantize_pytorch; import triton; print('All critical imports successful')"
 
 # ============================================================================
 # BUILDER STAGE: Set up the environment
