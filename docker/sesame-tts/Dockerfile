@@ -10,6 +10,8 @@ FROM ${BASE_IMAGE} AS resolver
 # Install git and essential build tools needed for Miniconda setup and potential builds
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl ca-certificates build-essential \
+    # Add rustc and cargo for packages that need Rust compilation (e.g., tokenizers)
+    rustc cargo \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Miniconda
