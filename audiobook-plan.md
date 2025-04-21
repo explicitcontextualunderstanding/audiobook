@@ -24,8 +24,8 @@ cd audiobook
 # Make scripts executable
 chmod +x *.py *.sh
 
-# Install required dependencies
-pip install -r requirements.txt
+# Install dependencies using the centralized script
+./scripts/install_dependencies.sh
 ```
 
 ### 1.3 Prepare Data Directory
