@@ -62,14 +62,14 @@ RUN chmod +x /opt/install_deps.sh && /opt/install_deps.sh
 # Copy requirements files
 COPY requirements.txt /tmp/requirements.txt
 
-# Install Triton separately first, forcing the Jetson index by temporarily disabling pip.conf
+# Install Triton separately first, forcing the specific Jetson index subdirectory
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
     echo "Temporarily disabling global pip config..." && \
     mv ~/.config/pip/pip.conf ~/.config/pip/pip.conf.bak && \
-    echo "Attempting to install Triton from Jetson AI Lab index ONLY..." && \
+    echo "Attempting to install Triton from Jetson AI Lab index subdirectory ONLY..." && \
     pip install --no-cache-dir \
-    --index-url https://pypi.jetson-ai-lab.dev/simple \
+    --index-url https://pypi.jetson-ai-lab.dev/jp6/cu128/ \
     triton==2.1.0 && \
     echo "Restoring global pip config..." && \
     mv ~/.config/pip/pip.conf.bak ~/.config/pip/pip.conf
