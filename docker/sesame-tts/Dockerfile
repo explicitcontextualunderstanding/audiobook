@@ -7,15 +7,28 @@ ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
 # ============================================================================
 FROM ${BASE_IMAGE} AS resolver
 
-# Install git and essential build tools needed for Miniconda setup and potential builds
+# Install git, essential build tools, rust, and pip-tools
+# Note: Installing pip-tools via apt might install an older version.
+# Consider installing via pip within the conda env later if needed.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl ca-certificates build-essential \
-    # Add rustc and cargo for packages that need Rust compilation (e.g., tokenizers)
     rustc cargo \
+    python3-pip \
+    && pip3 install --no-cache-dir pip-tools \
     && rm -rf /var/lib/apt/lists/*
+
+# Configure pip globally within the resolver stage (will be overridden in conda env)
+# This helps if pip-tools itself needs specific indices initially.
+RUN mkdir -p ~/.config/pip && \
+    echo "[global]" > ~/.config/pip/pip.conf && \
+    echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
+    echo "extra-index-url = https://pypi.ngc.nvidia.com https://pypi.org/simple" >> ~/.config/pip/pip.conf && \
+    echo "timeout = 120" >> ~/.config/pip/pip.conf && \
+    echo "retries = 5" >> ~/.config/pip/pip.conf
 
 # Install Miniconda
 ENV CONDA_DIR=/opt/conda
+ENV PATH=${CONDA_DIR}/bin:${PATH}
 RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -o Miniconda3.sh && \
     bash Miniconda3.sh -b -p ${CONDA_DIR} && \
     rm Miniconda3.sh && \
@@ -24,34 +37,32 @@ RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch
     ${CONDA_DIR}/bin/conda config --add channels conda-forge && \
     ${CONDA_DIR}/bin/conda clean -ya
 
-# Create the target Python environment and install pip-tools into it
-ENV PATH=${CONDA_DIR}/bin:${PATH}
+# Create the target Python environment
 RUN conda create -y -n tts python=3.10 pip setuptools wheel && \
-    conda run -n tts pip install --no-cache-dir pip-tools && \
     conda clean -ya
 
-# Configure pip within the tts environment to use the specific indices
-# Note: Conda run activates the env, ensuring pip.conf is placed correctly for that env's pip
-RUN conda run -n tts mkdir -p ~/.config/pip && \
+# Configure pip *within* the tts environment (overrides global)
+# Use conda run to execute commands within the environment
+RUN conda run -n tts /bin/bash -c '\
+    mkdir -p ~/.config/pip && \
     echo "[global]" > ~/.config/pip/pip.conf && \
     echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
     echo "extra-index-url = https://pypi.ngc.nvidia.com https://pypi.org/simple" >> ~/.config/pip/pip.conf && \
     echo "timeout = 120" >> ~/.config/pip/pip.conf && \
-    echo "retries = 5" >> ~/.config/pip/pip.conf
+    echo "retries = 5" >> ~/.config/pip/pip.conf'
 
-# Ensure the target directory exists
+# Ensure the target directory exists and copy requirements.in
 RUN mkdir -p /app
-# Copy the requirements file directly to the target path
-COPY ./requirements.in /app/requirements.in # Ensure your input file is named requirements.in
+COPY ./requirements.in /app/requirements.in # Make sure your input file is named requirements.in
 
-# Set WORKDIR after copying the file
 WORKDIR /app
 
 # Run pip-compile using the Python from the 'tts' conda environment
-# Using backtracking resolver for potentially better conflict handling
 # Use SHELL to ensure commands run within the activated conda environment
 SHELL ["/opt/conda/bin/conda", "run", "-n", "tts", "/bin/bash", "-c"]
-RUN echo "Resolving dependencies for Python 3.10 using pip-compile..." && \
+RUN echo "Installing pip-tools inside conda env just in case..." && \
+    pip install --no-cache-dir pip-tools && \
+    echo "Resolving dependencies for Python 3.10 using pip-compile..." && \
     pip-compile \
       --resolver=backtracking \
       --output-file=requirements.lock.txt \
@@ -85,6 +96,8 @@ ENV PYTHONUNBUFFERED=1 \
 # Install only essential system dependencies in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl git ca-certificates build-essential python3-dev software-properties-common \
+    # Add rustc and cargo here as well if any package needs runtime compilation
+    rustc cargo \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure pip for faster installations (still useful for conda/other installs)
@@ -105,11 +118,8 @@ RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch
     /opt/conda/bin/conda create -y -n tts python=3.10 pip setuptools wheel && \
     /opt/conda/bin/conda clean -ya
 
-# Ensure Conda is available in PATH (already set in ENV)
-# ENV PATH="/opt/conda/bin:$PATH" # Redundant due to ENV block above
-
 # Install ffmpeg separately if not found in Conda
-RUN /opt/conda/bin/conda install -n tts -c conda-forge ffmpeg || \
+RUN /opt/conda/bin/conda install -n tts -y -c conda-forge ffmpeg || \
     (apt-get update && \
     apt-get install -y --no-install-recommends software-properties-common && \
     add-apt-repository -y ppa:jonathonf/ffmpeg-4 && \
@@ -132,14 +142,14 @@ RUN source /opt/conda/bin/activate tts && \
     echo "Installing locked Python dependencies from requirements.lock.txt..." && \
     pip install --no-cache-dir \
       -r /tmp/requirements.lock.txt # Install using the lock file
-    # Note: Triton is now expected to be in the lock file, so separate install is removed.
-    # If Triton requires special handling outside pip-tools, it might need adjustment.
 
 # Verify critical imports to ensure dependencies are correctly installed
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
     echo "Verifying critical imports..." && \
     python -c "import torch; print(f'PyTorch version: {torch.__version__}'); import torchao; import torchtune; import moshi; import einops; import vector_quantize_pytorch; import triton; import librosa; import silentcipher; print('All critical imports successful')"
+# Reset SHELL to default
+SHELL ["/bin/bash", "-c"]
 
 # ============================================================================
 # BUILDER STAGE: Set up the environment
