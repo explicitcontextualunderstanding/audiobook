@@ -42,18 +42,23 @@ RUN conda run -n tts mkdir -p ~/.config/pip && \
 # Ensure the target directory exists
 RUN mkdir -p /app
 # Copy the requirements file directly to the target path
-COPY ./requirements.in /app/requirements.in
+COPY ./requirements.in /app/requirements.in # Ensure your input file is named requirements.in
 
 # Set WORKDIR after copying the file
 WORKDIR /app
 
 # Run pip-compile using the Python from the 'tts' conda environment
 # Using backtracking resolver for potentially better conflict handling
-RUN echo "Resolving dependencies using Python 3.10..." && \
-    /opt/conda/envs/tts/bin/python -m piptools compile \
+# Use SHELL to ensure commands run within the activated conda environment
+SHELL ["/opt/conda/bin/conda", "run", "-n", "tts", "/bin/bash", "-c"]
+RUN echo "Resolving dependencies for Python 3.10 using pip-compile..." && \
+    pip-compile \
       --resolver=backtracking \
       --output-file=requirements.lock.txt \
+      --verbose \
       requirements.in
+# Reset SHELL to default
+SHELL ["/bin/bash", "-c"]
 
 # --- End of Resolver Stage ---
 
