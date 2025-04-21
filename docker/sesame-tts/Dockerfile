@@ -14,11 +14,6 @@ LABEL com.nvidia.cuda.version="12.8"
 # Set up working directory for the build process
 WORKDIR /opt/build
 
-# Copy build resources with proper .dockerignore handling
-COPY docker/sesame-tts/requirements.txt ./requirements.txt
-COPY docker/sesame-tts/build.sh ./build.sh
-COPY docker/sesame-tts/utils/ ./utils/
-
 # Environment variables for the build
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -31,37 +26,56 @@ ENV PYTHONUNBUFFERED=1 \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=all \
     CONDA_DIR=/opt/conda \
-    PATH="/root/.cargo/bin:${PATH}"
+    PATH="/root/.cargo/bin:${PATH}" \
+    # Performance optimizations
+    PYTHONHASHSEED=0 \
+    PIP_DEFAULT_TIMEOUT=100 \
+    CUDA_MODULE_LOADING=LAZY \
+    TORCH_USE_CUDA_DSA=1
 
-# Consolidated build step including all installation tasks
+# Create necessary directories first for better layering
+RUN mkdir -p ${MODELS_DIR} ${AUDIOBOOK_DATA} ${BOOKS_DIR} /segments /opt/csm /opt/tritonserver \
+    && mkdir -p ~/.config/pip
+
+# Copy build resources with proper .dockerignore handling
+COPY docker/sesame-tts/requirements.txt ./requirements.txt
+COPY docker/sesame-tts/build.sh ./build.sh
+COPY docker/sesame-tts/utils/ ./utils/
+
+# Run the optimized build script
 RUN chmod +x build.sh && \
-    ./build.sh && \
-    # Install Triton Inference Server
-    wget https://github.com/triton-inference-server/server/releases/download/v2.55.0/tritonserver2.55.0-igpu.tar \
-      -O triton.tar && \
-    mkdir -p /opt/tritonserver && \
-    tar -xf triton.tar -C /opt/tritonserver --strip-components=1 && rm triton.tar && \
-    # Create the CSM package with clean imports
-    mkdir -p /opt/csm && \
+    /bin/bash -c "set -e && ./build.sh"
+
+# Download and install Triton Inference Server as a separate layer
+RUN echo "Installing Triton Inference Server..." && \
+    wget --quiet https://github.com/triton-inference-server/server/releases/download/v2.55.0/tritonserver2.55.0-igpu.tar \
+    -O triton.tar && \
+    tar -xf triton.tar -C /opt/tritonserver --strip-components=1 && \
+    rm triton.tar
+
+# Set up CSM package (doing this as a separate step for better caching)
+RUN echo "Setting up CSM package..." && \
     git clone --depth 1 https://github.com/SesameAILabs/csm.git /tmp/csm && \
     cp /tmp/csm/generator.py /opt/csm/ && \
     cp /tmp/csm/models.py /opt/csm/ && \
-    # Copy custom modifications 
     cp ./utils/audiobook_generator.py /opt/csm/ && \
     cp ./utils/watermarking.py /opt/csm/ && \
-    # Set proper permissions
     chmod +x /opt/csm/watermarking.py && \
-    # Clean up
-    rm -rf /tmp/csm && \
-    # Install Python Triton package for torchao kernels
-    /opt/conda/bin/conda run -n tts pip install --no-cache-dir triton && \
-    # Create necessary data directories
-    mkdir -p ${MODELS_DIR} ${AUDIOBOOK_DATA} ${BOOKS_DIR} /segments && \
-    # Strip unneeded files to reduce image size
+    rm -rf /tmp/csm
+
+# Install Python Triton package for torchao kernels (separated for better caching)
+RUN echo "Installing Triton for torchao..." && \
+    /opt/conda/bin/conda run -n tts pip install --no-cache-dir \
+    --index-url https://pypi.jetson-ai-lab.dev/simple \
+    --extra-index-url https://pypi.org/simple \
+    triton
+    
+# Final cleanup to reduce image size
+RUN echo "Final cleanup..." && \
     find /opt/conda -name "*.a" -delete && \
     find /opt/conda -name "*.js.map" -delete && \
     rm -rf /opt/conda/pkgs && \
-    rm -rf /root/.cache
+    rm -rf /root/.cache /tmp/* /var/tmp/*
 
 # ============================================================================
 # RUNTIME STAGE: Create the minimal runtime image
