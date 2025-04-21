@@ -12,8 +12,8 @@ PUSH=${2:-false}
 IMAGE_NAME="sesame-ai/sesame-tts:${TAG}"
 DOCKERFILE="docker/sesame-tts/Dockerfile"
 
-# build
-docker build \
+# build (no cache to ensure updated build.sh is used)
+docker build --no-cache \
   --file "$DOCKERFILE" \
   --tag "$IMAGE_NAME" \
   --build-arg BUILD_DATE="$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
