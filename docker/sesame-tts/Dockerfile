@@ -22,7 +22,8 @@ RUN mkdir -p ~/.config/pip && \
     echo "timeout = 120" >> ~/.config/pip/pip.conf && \
     echo "retries = 5" >> ~/.config/pip/pip.conf
 
-# Copy only the input requirements file
+# Ensure the target directory exists and set it as WORKDIR
+RUN mkdir -p /app
 WORKDIR /app
 COPY ./requirements.in . # Explicitly reference file from context root
 
