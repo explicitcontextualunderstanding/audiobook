@@ -57,35 +57,88 @@ chmod +x quickstart.sh
 ./quickstart.sh --input /path/to/your/book.epub --method sesame # For Sesame CSM (higher quality)
 ```
 
-## 2. Dockerfile Overview
+## 2. Docker Container Build Improvements
 
-The Dockerfile has been optimized for faster builds and includes the following key features:
-- **Multi-stage builds**: Separate stages for dependencies, building, and runtime to minimize the final image size.
-- **Conda-based environment**: Miniconda is used to manage Python dependencies, ensuring compatibility with Jetson's ARM64 architecture.
-- **Custom PyPI index**: The `https://pypi.jetson-ai-lab.dev/simple` index is used to prioritize pre-built wheels optimized for Jetson devices.
-- **Fallback mechanisms**: If `ffmpeg` installation via Conda fails, the Dockerfile falls back to installing it via `apt-get` with the `jonathonf/ffmpeg-4` PPA.
+Based on our recent development history, we've made several key improvements to the Docker build process:
 
-### Key Dockerfile Commands
-- **Install Miniconda**:
-  ```bash
-  curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -o Miniconda3.sh
-  bash Miniconda3.sh -b -p /opt/conda
-  ```
-- **Install PyTorch stack**:
-  ```bash
-  pip install --no-cache-dir --prefer-binary \
-      --index-url https://pypi.jetson-ai-lab.dev/simple \
-      torch==2.6.0 torchvision==0.17.0 torchaudio==2.6.0
-  ```
-- **Install `ffmpeg`**:
-  ```bash
-  /opt/conda/bin/conda install -n tts -c conda-forge ffmpeg || \
-      (apt-get update && \
-      apt-get install -y --no-install-recommends software-properties-common && \
-      add-apt-repository -y ppa:jonathonf/ffmpeg-4 && \
-      apt-get update && \
-      apt-get install -y --no-install-recommends ffmpeg)
-  ```
+### 2.1 BuildKit Optimization
+Use BuildKit for faster, more efficient builds:
+```bash
+DOCKER_BUILDKIT=1 docker build -t sesame-tts-jetson -f docker/sesame-tts/Dockerfile .
+```
+
+### 2.2 Dependency Management Evolution
+Our dependency management strategy has evolved to address several challenges:
+
+#### 2.2.1 Key Python Package Dependencies
+- **Vector Quantize PyTorch**: We've resolved installation issues by updating from version 1.8.6 to 1.22.15, removing the need for complex fallback mechanisms.
+- **Einops**: Updated from 0.7.0 to >=0.8.0 to resolve compatibility issues.
+- **SilentCipher**: Switched from git-based installation to PyPI package (>=1.0.1).
+- **Specialized Packages**: Core packages like `torchao`, `torchtune`, and `moshi` remain pinned to specific versions for stability.
+
+#### 2.2.2 Recommended requirements.txt Configuration
+```
+# Core PyTorch - installed separately in Dockerfile
+torch==2.6.0
+torchvision==0.17.0
+torchaudio==2.6.0
+
+# Transformers & Tokenizers - minimal versions to reduce download size
+tokenizers>=0.13.3
+transformers>=4.31.0
+huggingface_hub>=0.16.4
+accelerate>=0.25.0
+
+# Audio processing
+soundfile>=0.12.1
+pydub>=0.25.1
+sounddevice>=0.5.0
+
+# Text extraction & NLP
+ebooklib>=0.18.0
+beautifulsoup4>=4.12.2
+PyPDF2>=3.0.1
+pdfminer.six>=20221105
+nltk>=3.8.1
+
+# Core packages with specific version requirements
+vector_quantize_pytorch==1.22.15  # Must use this version for compatibility
+torchtune==0.3.0                  # Performance-critical component
+torchao==0.1.0                    # Performance-critical component
+moshi==0.2.2                      # Required for model interface
+silentcipher>=1.0.1               # Now available via PyPI
+librosa>=0.10.1                   # Required by silentcipher
+
+# Other utilities
+einops>=0.8.0                    # Updated for compatibility
+sphn>=0.1.4
+rotary_embedding_torch>=0.2.5
+datasets>=2.16.1
+
+# System utils
+tqdm>=4.66.1
+psutil>=5.9.6
+```
+
+### 2.3 Multi-Stage Docker Build
+
+We've optimized the Dockerfile with a multi-stage approach:
+1. **Dependencies Stage**: Installs all dependencies and caches them
+2. **Builder Stage**: Sets up models, utilities, and configuration
+3. **Runtime Stage**: Creates the minimal runtime image
+
+This approach significantly reduces the final image size and improves build times through better caching.
+
+### 2.4 Testing the Build
+
+Use our provided scripts to build and test the container:
+```bash
+# Build the container with BuildKit enabled
+./scripts/build.sh --use-buildkit --cache
+
+# Test the container
+./scripts/test_container.sh
+```
 
 ## 3. Approach 1: Generating Audiobook with Piper (via jetson-containers)
 
@@ -163,7 +216,56 @@ docker run --runtime nvidia -it --rm \
   --memory_per_chunk 150
 ```
 
-## 5. Future Improvements
+## 5. Troubleshooting Docker Build Issues
+
+Based on our development history, here are common issues and solutions:
+
+### 5.1 Package Installation Failures
+
+If you encounter package installation failures:
+
+1. **Check Base Image Availability**:
+   ```bash
+   docker pull dustynv/pytorch:2.6-r36.4.0-cu128-24.04
+   ```
+
+2. **Network/PyPI Mirror Issues**:
+   If the Jetson-specific PyPI mirrors are inaccessible, modify the Dockerfile to use standard PyPI:
+   ```bash
+   # Comment out this line:
+   # echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf
+   ```
+
+3. **Architecture Issues**:
+   If building on an x86 machine for Jetson (ARM64), use cross-platform building:
+   ```bash
+   docker buildx create --use
+   docker buildx build --platform linux/arm64 -t sesame-tts-jetson .
+   ```
+
+4. **Debug Specific Stage**:
+   Target a specific build stage to identify where the failure occurs:
+   ```bash
+   docker build --target dependencies -t sesame-tts-deps .
+   ```
+
+5. **Verbose Output**:
+   Use verbose output to see detailed error messages:
+   ```bash
+   DOCKER_BUILDKIT=1 docker build --progress=plain -t sesame-tts-jetson .
+   ```
+
+### 5.2 Recommended Environment Variables
+
+Set these environment variables for optimal builds:
+```bash
+export DOCKER_BUILDKIT=1
+export BUILDKIT_PROGRESS=plain
+export PYTHONHASHSEED=0
+export PIP_DEFAULT_TIMEOUT=100
+```
+
+## 6. Future Improvements
 
 Planned improvements for the project include:
 1. **Multi-voice Audiobooks**: Support for using different voices for dialogue vs. narration.
@@ -171,8 +273,9 @@ Planned improvements for the project include:
 3. **Custom Voice Training**: Support for training your own voice models.
 4. **Web Interface**: A simple web UI for generating audiobooks without the command line.
 5. **Chapter Metadata**: Adding chapter metadata to the generated MP3 files for better navigation.
-6. **Optimized Build Process**: Further reducing build times and image sizes.
+6. **Further Build Optimization**: Continue refining dependency management and build process based on our learnings.
+7. **Cross-Platform Support**: Improve compatibility across different host architectures.
 
-## 6. License
+## 7. License
 
 This project is open source and available under the MIT License.
