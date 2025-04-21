@@ -1,0 +1,107 @@
+# Test Dockerfile for validating wheel assumptions
+# This version attempts to use pre-built wheels as much as possible
+
+ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
+
+FROM ${BASE_IMAGE} AS tester
+
+# Add container metadata
+LABEL org.opencontainers.image.description="Test image for validating wheel assumptions"
+LABEL org.opencontainers.image.source="https://github.com/explicitcontextualunderstanding/audiobook"
+
+# Set working directory
+WORKDIR /opt/wheel-test
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    CUDA_MODULE_LOADING=LAZY \
+    TORCH_USE_CUDA_DSA=1
+
+# Install basic system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg libsndfile1 curl wget git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create test directory
+RUN mkdir -p /test-results
+
+# Setup pip configuration to prioritize Jetson wheels
+RUN mkdir -p ~/.config/pip && \
+    echo "[global]" > ~/.config/pip/pip.conf && \
+    echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
+    echo "extra-index-url = https://pypi.org/simple" >> ~/.config/pip/pip.conf
+
+# 1. Test: Standard PyPI wheels
+RUN echo "=== Test 1: Standard PyPI wheels ===" > /test-results/wheel-test.log && \
+    python -m pip install --no-cache-dir --index-url https://pypi.org/simple \
+    torch==2.6.0 torchvision==0.17.0 torchaudio==2.6.0 2>> /test-results/wheel-test.log || \
+    echo "Standard PyPI wheels installation failed" >> /test-results/wheel-test.log && \
+    python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" \
+    2>> /test-results/wheel-test.log >> /test-results/wheel-test.log || \
+    echo "Standard PyPI wheels import failed" >> /test-results/wheel-test.log
+
+# 2. Test: Jetson AI Lab wheels
+RUN echo "=== Test 2: Jetson AI Lab wheels ===" >> /test-results/wheel-test.log && \
+    python -m pip install --no-cache-dir --force-reinstall \
+    --index-url https://pypi.jetson-ai-lab.dev/simple \
+    torch==2.6.0 torchvision==0.17.0 torchaudio==2.6.0 2>> /test-results/wheel-test.log || \
+    echo "Jetson AI Lab wheels installation failed" >> /test-results/wheel-test.log && \
+    python -c "import torch; print(f'PyTorch version: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')" \
+    2>> /test-results/wheel-test.log >> /test-results/wheel-test.log || \
+    echo "Jetson AI Lab wheels import failed" >> /test-results/wheel-test.log
+
+# 3. Test: torchao installation
+RUN echo "=== Test 3: torchao installation ===" >> /test-results/wheel-test.log && \
+    python -m pip install --no-cache-dir --prefer-binary torchao==0.1.0 2>> /test-results/wheel-test.log || \
+    echo "torchao wheel installation failed" >> /test-results/wheel-test.log && \
+    python -c "import torchao; print(f'TorchAO version: {torchao.__version__ if hasattr(torchao, \"__version__\") else \"unknown\"}')" \
+    2>> /test-results/wheel-test.log >> /test-results/wheel-test.log || \
+    echo "torchao import failed" >> /test-results/wheel-test.log
+
+# 4. Test: torchtune installation
+RUN echo "=== Test 4: torchtune installation ===" >> /test-results/wheel-test.log && \
+    python -m pip install --no-cache-dir --prefer-binary torchtune==0.3.0 2>> /test-results/wheel-test.log || \
+    echo "torchtune wheel installation failed" >> /test-results/wheel-test.log && \
+    python -c "import torchtune; print(f'Torchtune version: {torchtune.__version__ if hasattr(torchtune, \"__version__\") else \"unknown\"}')" \
+    2>> /test-results/wheel-test.log >> /test-results/wheel-test.log || \
+    echo "torchtune import failed" >> /test-results/wheel-test.log
+
+# 5. Test: moshi installation
+RUN echo "=== Test 5: moshi installation ===" >> /test-results/wheel-test.log && \
+    python -m pip install --no-cache-dir --prefer-binary moshi==0.2.2 2>> /test-results/wheel-test.log || \
+    echo "moshi wheel installation failed" >> /test-results/wheel-test.log && \
+    python -c "import moshi; print(f'Moshi version: {moshi.__version__ if hasattr(moshi, \"__version__\") else \"unknown\"}')" \
+    2>> /test-results/wheel-test.log >> /test-results/wheel-test.log || \
+    echo "moshi import failed" >> /test-results/wheel-test.log
+
+# 6. Test: triton installation
+RUN echo "=== Test 6: triton installation ===" >> /test-results/wheel-test.log && \
+    python -m pip install --no-cache-dir --prefer-binary triton 2>> /test-results/wheel-test.log || \
+    echo "triton wheel installation failed" >> /test-results/wheel-test.log && \
+    python -c "import triton; print(f'Triton version: {triton.__version__ if hasattr(triton, \"__version__\") else \"unknown\"}')" \
+    2>> /test-results/wheel-test.log >> /test-results/wheel-test.log || \
+    echo "triton import failed" >> /test-results/wheel-test.log
+
+# 7. Test: Complete dependency chain
+RUN echo "=== Test 7: Complete dependency chain ===" >> /test-results/wheel-test.log && \
+    python -c "import torch, torchao, torchtune, moshi; print('All imports successful')" \
+    2>> /test-results/wheel-test.log >> /test-results/wheel-test.log || \
+    echo "Complete dependency chain import failed" >> /test-results/wheel-test.log
+
+# 8. Test: Install from requirements file using wheels
+COPY docker/sesame-tts/requirements.txt /opt/wheel-test/
+RUN echo "=== Test 8: Requirements file with wheels ===" >> /test-results/wheel-test.log && \
+    python -m pip install --no-cache-dir --prefer-binary -r requirements.txt \
+    2>> /test-results/wheel-test.log || \
+    echo "Requirements file installation failed" >> /test-results/wheel-test.log
+
+# Create a script to view the test results
+RUN echo '#!/bin/bash' > /usr/local/bin/view-results && \
+    echo 'cat /test-results/wheel-test.log' >> /usr/local/bin/view-results && \
+    chmod +x /usr/local/bin/view-results
+
+# Set command to output the test results
+CMD ["view-results"]

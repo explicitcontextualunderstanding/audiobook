@@ -319,7 +319,35 @@ du -sh ~/audiobook_data
 du -sh ~/.cache/huggingface
 ```
 
-## 9. Future Improvements
+## 9. Build Optimization and Python Wheels
+
+The build process for the Docker containers, particularly the Sesame CSM container, can be time-consuming. We need to validate our build assumptions and optimize the process.
+
+### 9.1 Python Wheels Considerations
+
+Using pre-built Python wheels could potentially reduce build times, but several factors need consideration:
+
+1. **Architecture Compatibility**: Standard PyPI wheels are typically compiled for x86_64 architecture, while Jetson uses ARM64 (aarch64).
+
+2. **CUDA Compatibility**: Our application requires CUDA 12.8 support, which may not be available in standard wheels.
+
+3. **Dependency Chain Complexity**: Complex interdependencies between torchao, torchtune, and moshi must be satisfied.
+
+4. **Jetson-specific Optimizations**: Some performance optimizations require specific compilation flags.
+
+### 9.2 Potential Solutions
+
+1. **Jetson AI Lab PyPI Mirror**: The mirror at https://pypi.jetson-ai-lab.dev/simple hosts pre-built wheels optimized for Jetson devices.
+
+2. **Multi-stage Docker Builds**: Separate build and runtime stages can help optimize the final image size.
+
+3. **Dependency Caching**: Pre-building and caching slow-to-build dependencies like torchao.
+
+4. **Optimized Layer Ordering**: Restructuring the Dockerfile to better leverage Docker's layer caching.
+
+See the [Build Validation Plan](build-validation.md) for detailed steps to validate these approaches and measure their effectiveness.
+
+## 10. Future Improvements
 
 Planned improvements for the project include:
 
@@ -330,7 +358,8 @@ Planned improvements for the project include:
 5. **Chapter Metadata**: Adding chapter metadata to the generated MP3 files for better navigation
 6. **Fine-tuned models**: Specialized models for different types of content (fiction, technical, etc.)
 7. **Batch job management**: Ability to queue multiple books for sequential processing
+8. **Optimized Build Process**: Implementing the validated approaches from the build optimization tests
 
-## 10. License
+## 11. License
 
 This project is open source and available under the MIT License.
