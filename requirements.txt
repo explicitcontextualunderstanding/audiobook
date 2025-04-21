@@ -42,7 +42,7 @@ torchao==0.1.0
 torchtune==0.3.0
 # Model serialization (Sesame specific?) - Pinned for specific CSM features/compatibility
 moshi==0.2.2
-# Watermarking/Encryption (Sesame specific) - Pinned to specific repo version
-silentcipher @ git+https://github.com/SesameAILabs/silentcipher@v1.0.2
+# Watermarking/Encryption (Sesame specific) - Pinned to latest available repo tag
+silentcipher @ git+https://github.com/SesameAILabs/silentcipher@v1.0.1
 # Triton Inference Server client/utils (needed for torchao kernels?) - No specific version pinned yet
 triton
