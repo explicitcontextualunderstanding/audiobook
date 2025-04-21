@@ -24,7 +24,7 @@ RUN mkdir -p ~/.config/pip && \
 
 # Copy only the input requirements file
 WORKDIR /app
-COPY requirements.in .
+COPY ./requirements.in . # Explicitly reference file from context root
 
 # Run pip-compile to resolve dependencies and create the lock file
 # Using backtracking resolver for potentially better conflict handling
