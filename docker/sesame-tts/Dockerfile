@@ -58,6 +58,12 @@ RUN /opt/conda/bin/conda install -n tts -c conda-forge ffmpeg || \
 # Copy requirements files
 COPY docker/sesame-tts/requirements.txt /tmp/requirements.txt
 
+# Install Rust toolchain (cargo) for compiling extensions
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y && \
+    source $HOME/.cargo/env && \
+    rustup default stable && \
+    rustup update
+
 # Activate conda environment and install PyTorch dependencies
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
