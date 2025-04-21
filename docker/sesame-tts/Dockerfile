@@ -71,8 +71,8 @@ RUN source /opt/conda/bin/activate tts && \
     --extra-index-url https://pypi.org/simple \
     -r /tmp/requirements.txt || \
     (echo "Attempting fallback installation for vector_quantize_pytorch" && \
-    pip install --no-cache-dir --prefer-binary \
-    "vector_quantize_pytorch @ git+https://github.com/lucidrains/vector-quantize-pytorch.git@<valid_commit_hash>")
+    pip install --no-cache-dir \
+    "vector_quantize_pytorch @ git+https://github.com/lucidrains/vector-quantize-pytorch.git@492e780")
 
 # Install specialized dependencies in a separate layer
 SHELL ["/bin/bash", "-c"]
