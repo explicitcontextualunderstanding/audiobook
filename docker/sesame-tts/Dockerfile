@@ -62,11 +62,11 @@ RUN chmod +x /opt/install_deps.sh && /opt/install_deps.sh
 # Copy requirements files
 COPY requirements.txt /tmp/requirements.txt
 
-# Install Triton separately first, forcing the Jetson index
+# Install Triton separately first, forcing the Jetson index and ignoring others
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
     echo "Attempting to install Triton from Jetson AI Lab index..." && \
-    pip install --no-cache-dir \
+    PIP_EXTRA_INDEX_URL="" pip install --no-cache-dir \
     --index-url https://pypi.jetson-ai-lab.dev/simple \
     triton==2.1.0
 
