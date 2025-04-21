@@ -47,7 +47,13 @@ ENV PATH="/opt/conda/bin:$PATH"
 
 # Install ffmpeg separately if not found in Conda
 RUN /opt/conda/bin/conda install -n tts -c conda-forge ffmpeg || \
-    apt-get update && apt-get install -y ffmpeg && apt-get clean
+    (apt-get update && \
+    apt-get install -y --no-install-recommends software-properties-common && \
+    add-apt-repository -y ppa:jonathonf/ffmpeg-4 && \
+    apt-get update && \
+    apt-get install -y --no-install-recommends ffmpeg && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*) || \
+    (echo "Failed to install ffmpeg. Please check your repositories and try again." && exit 1)
 
 # Copy requirements files
 COPY docker/sesame-tts/requirements.txt /tmp/requirements.txt
@@ -78,19 +84,15 @@ SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
     # Install specialized packages separately
     pip install --no-cache-dir --prefer-binary \
-    --index-url https://pypi.jetson-ai-lab.dev/simple \
     "torchao==0.1.0" "torchtune==0.3.0" && \
     # Force reinstall moshi to ensure correct version
     pip install --force-reinstall --no-cache-dir --prefer-binary \
-    --index-url https://pypi.jetson-ai-lab.dev/simple \
     "moshi==0.2.2" && \
     # Special dependencies
     pip install --no-cache-dir --prefer-binary \
     "silentcipher @ git+https://github.com/SesameAILabs/silentcipher@v1.0.2" && \
     # Install triton for torchao kernels
     pip install --no-cache-dir --prefer-binary \
-    --index-url https://pypi.jetson-ai-lab.dev/simple \
-    --extra-index-url https://pypi.org/simple \
     triton
 
 # Verify critical imports to ensure dependencies are correctly installed
