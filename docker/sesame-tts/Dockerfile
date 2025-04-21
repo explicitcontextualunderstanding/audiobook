@@ -62,24 +62,14 @@ RUN chmod +x /opt/install_deps.sh && /opt/install_deps.sh
 # Copy requirements files
 COPY requirements.txt /tmp/requirements.txt
 
-# Install Python dependencies in two steps
+# Install Python dependencies
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
-    # Step 1: Install all dependencies except vector_quantize_pytorch
-    echo "Installing dependencies from requirements.txt (excluding vector_quantize_pytorch)..." && \
     pip install --no-cache-dir --prefer-binary \
     --index-url https://pypi.jetson-ai-lab.dev/simple \
     --extra-index-url https://pypi.ngc.nvidia.com \
     --extra-index-url https://pypi.org/simple \
-    $(grep -v "vector_quantize_pytorch" /tmp/requirements.txt) && \
-    \
-    # Step 2: Install vector_quantize_pytorch, allowing build from source
-    echo "Installing vector_quantize_pytorch (allowing build from source)..." && \
-    pip install --no-cache-dir \
-    --index-url https://pypi.jetson-ai-lab.dev/simple \
-    --extra-index-url https://pypi.ngc.nvidia.com \
-    --extra-index-url https://pypi.org/simple \
-    "vector_quantize_pytorch==1.8.6"
+    -r /tmp/requirements.txt
 
 # Install specialized dependencies in a separate layer
 SHELL ["/bin/bash", "-c"]
