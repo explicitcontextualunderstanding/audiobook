@@ -60,12 +60,14 @@ COPY docker/sesame-tts/requirements.txt /tmp/requirements.txt
 
 # Install Rust toolchain (cargo) for compiling extensions
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y && \
+    echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /etc/profile.d/rust.sh && \
+    chmod +x /etc/profile.d/rust.sh && \
     . $HOME/.cargo/env && \
     rustup default stable && \
     rustup update
 
-# Ensure Rust binaries are available in PATH
-ENV PATH="$HOME/.cargo/bin:$PATH"
+# Ensure Rust binaries are available in PATH for all subsequent steps
+ENV PATH="/root/.cargo/bin:$PATH"
 
 # Activate conda environment and install PyTorch dependencies
 SHELL ["/bin/bash", "-c"]
