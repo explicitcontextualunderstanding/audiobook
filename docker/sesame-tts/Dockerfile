@@ -55,43 +55,21 @@ RUN /opt/conda/bin/conda install -n tts -c conda-forge ffmpeg || \
     apt-get clean && rm -rf /var/lib/apt/lists/*) || \
     (echo "Failed to install ffmpeg. Please check your repositories and try again." && exit 1)
 
+# Copy the dependency installation script into the container
+COPY docker/sesame-tts/install_deps.sh /opt/install_deps.sh
+RUN chmod +x /opt/install_deps.sh && /opt/install_deps.sh
+
 # Copy requirements files
-COPY docker/sesame-tts/requirements.txt /tmp/requirements.txt
+COPY requirements.txt /tmp/requirements.txt
 
-# Install Rust toolchain (cargo) for compiling extensions
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y && \
-    echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /etc/profile.d/rust.sh && \
-    chmod +x /etc/profile.d/rust.sh && \
-    . $HOME/.cargo/env && \
-    rustup default stable && \
-    rustup update
-
-# Ensure Rust binaries are available in PATH for all subsequent steps
-ENV PATH="/root/.cargo/bin:$PATH"
-
-# Activate conda environment and install PyTorch dependencies
+# Install Python dependencies
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
-    python -m pip install --no-cache-dir --upgrade pip && \
-    # Install PyTorch stack with compatible versions
     pip install --no-cache-dir --prefer-binary \
     --index-url https://pypi.jetson-ai-lab.dev/simple \
     --extra-index-url https://pypi.ngc.nvidia.com \
     --extra-index-url https://pypi.org/simple \
-    torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0
-
-# Install the rest of the requirements (separated to leverage caching)
-SHELL ["/bin/bash", "-c"]
-RUN source /opt/conda/bin/activate tts && \
-    # Install general dependencies, filtering out comments and empty lines
-    pip install --no-cache-dir --prefer-binary \
-    --index-url https://pypi.jetson-ai-lab.dev/simple \
-    --extra-index-url https://pypi.ngc.nvidia.com \
-    --extra-index-url https://pypi.org/simple \
-    $(grep -vE "^\s*(#|$)" /tmp/requirements.txt) || \
-    (echo "Attempting fallback installation for vector_quantize_pytorch" && \
-    pip install --no-cache-dir --prefer-binary \
-    "vector_quantize_pytorch @ git+https://github.com/lucidrains/vector-quantize-pytorch.git@1.8.6")
+    -r /tmp/requirements.txt
 
 # Install specialized dependencies in a separate layer
 SHELL ["/bin/bash", "-c"]
