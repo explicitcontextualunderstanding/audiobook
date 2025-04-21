@@ -62,29 +62,28 @@ RUN chmod +x /opt/install_deps.sh && /opt/install_deps.sh
 # Copy requirements files
 COPY requirements.txt /tmp/requirements.txt
 
-# Install Python dependencies from the updated requirements file
-# Assumes requirements.txt now includes:
-# - einops>=0.8.0
-# - vector_quantize_pytorch==1.22.15
-# - torchao==0.1.0
-# - torchtune==0.3.0
-# - moshi==0.2.2
-# - silentcipher @ git+https://github.com/SesameAILabs/silentcipher@v1.0.2
-# - triton
-# - All original requirements
+# Install Python dependencies from the updated requirements file (excluding triton)
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
-    echo "Installing all Python dependencies from requirements.txt..." && \
+    echo "Installing Python dependencies from requirements.txt..." && \
     pip install --no-cache-dir \
     --index-url https://pypi.jetson-ai-lab.dev/simple \
     --extra-index-url https://pypi.ngc.nvidia.com \
     --extra-index-url https://pypi.org/simple \
     -r /tmp/requirements.txt
 
+# Install triton separately from the Jetson AI Lab index
+SHELL ["/bin/bash", "-c"]
+RUN source /opt/conda/bin/activate tts && \
+    echo "Installing triton from Jetson AI Lab index..." && \
+    pip install --no-cache-dir \
+    --index-url https://pypi.jetson-ai-lab.dev/simple \
+    triton==2.1.0
+
 # Verify critical imports to ensure dependencies are correctly installed
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
-    python -c "import torch; print(f'PyTorch version: {torch.__version__}'); import torchao; import torchtune; import moshi; import einops; import vector_quantize_pytorch; import triton; print('All critical imports successful')"
+    python -c "import torch; print(f'PyTorch version: {torch.__version__}'); import torchao; import torchtune; import moshi; import einops; import vector_quantize_pytorch; import triton; import librosa; import silentcipher; print('All critical imports successful')"
 
 # ============================================================================
 # BUILDER STAGE: Set up the environment
