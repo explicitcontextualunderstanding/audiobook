@@ -1,29 +1,22 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Default run script for sesame-tts container
+set -e
 
-# Activate conda environment
-source /opt/conda/bin/activate tts
-
-# If entrypoint.sh exists, use it
-if [ -f /usr/local/bin/entrypoint.sh ]; then
-    echo "Starting Sesame TTS service via entrypoint script..."
-    exec /usr/local/bin/entrypoint.sh "$@"
+# Check if we have an argument
+if [ "$#" -gt 0 ]; then
+    # If we have arguments, run them directly
+    exec "$@"
 else
-    echo "Welcome to Sesame TTS container!"
+    # Default behavior: launch an interactive environment
+    echo "=== Sesame TTS Container ==="
+    echo "TTS model is available in the Python environment."
+    echo "You can load it with:"
     echo ""
-    echo "Available commands:"
-    echo "  - Generate audiobook from text file:"
-    echo "    python ${BOOKS_DIR}/generate_audiobook_sesame.py /path/to/input.txt /path/to/output.wav"
+    echo "  import sys"
+    echo "  sys.path.append('/opt/csm')"
+    echo "  from generator import load_csm_1b, Generator"
     echo ""
-    echo "  - Generate audiobook from EPUB:"
-    echo "    python ${BOOKS_DIR}/generate_audiobook_sesame_epub.py /path/to/book.epub /path/to/output.wav"
-    echo ""
-    echo "  - Extract chapters:"
-    echo "    python ${BOOKS_DIR}/extract_chapters.py /path/to/book.epub"
-    echo ""
-    echo "  - Test CSM TTS:"
-    echo "    python /usr/local/bin/utils/test_csm.py"
-    echo ""
-    
-    # Launch interactive bash shell with conda environment activated
-    exec bash
+    echo "Starting interactive shell..."
+    echo "================================"
+    exec /bin/bash
 fi

@@ -1,34 +1,75 @@
 #!/usr/bin/env python3
-from jetson_containers import L4T_VERSION, CUDA_VERSION, package
+# Copyright (c) 2024 SesameAI. All rights reserved.
 
-# Define the package with configuration and build arguments
+"""
+Configuration script for Sesame CSM TTS model for audiobook generation.
+This follows the jetson-containers framework architecture.
+"""
+
+import os
+
+# Try to import package and requires functions (will be available in the jetson-containers environment)
+try:
+    from jetson_containers import package, requires
+except ImportError:
+    # Provide mock implementations for standalone testing
+    def package(name, **kwargs):
+        kwargs['name'] = name
+        return kwargs
+        
+    def requires(*args, **kwargs):
+        return args
+
+# Get environment variables
+CUDA_VERSION = os.environ.get('CUDA_VERSION', 'cu128')
+L4T_VERSION = os.environ.get('L4T_VERSION', 'r36.4.0')
+LSB_RELEASE = os.environ.get('LSB_RELEASE', '24.04')
+
+# Define base package configuration
 sesame_tts = package(
     name='sesame-tts',
-    category='audio',
-    license='MIT',
-    requires=[
-        '>=jp6.1',  # Requires Jetpack 6.1 or newer
-        '==aarch64'  # Only for ARM64 architecture
-    ],
+    license='https://github.com/SesameAILabs/csm',
     depends=[
-        'python',
-        'pytorch'
+        'python:3.10',
+        'pytorch:2.6',
+        'cuda',
+        'ffmpeg',
+        'torchaudio',
     ],
-    arch=['aarch64'],
-    description='Sesame CSM text-to-speech for Jetson',
-    
-    # Build arguments passed to Dockerfile
+    requires=[
+        '>=cu118',  # Requires at least CUDA 11.8
+        'jp6',      # Requires JetPack 6.x
+        '==aarch64' # Only for ARM64 architecture
+    ],
     build_args={
-        'PYTORCH_IMAGE': 'dustynv/pytorch:2.6-r36.4.0-cu128-24.04',
-        'JETPACK_VERSION': '6.1',
-        'CUDA_VERSION': '12.8',
-    },
-    
-    # These paths are automatically used by the framework
-    test_script='test.sh',
-    run_script='run.sh',
-    docs='docs.md',
+        'BASE_IMAGE': f'dustynv/pytorch:2.6-{L4T_VERSION}-{CUDA_VERSION}-{LSB_RELEASE}',
+    }
 )
 
-# Set as default package for this directory
-package = sesame_tts
+# Variant with minimum dependencies (for testing)
+sesame_tts_minimal = package(
+    name='sesame-tts:minimal',
+    license='https://github.com/SesameAILabs/csm',
+    depends=[
+        'python:3.10',
+        'pytorch:2.6',
+        'cuda'
+    ],
+    requires=[
+        '>=cu118',
+        'jp6',
+        '==aarch64'
+    ],
+    build_args={
+        'BASE_IMAGE': f'dustynv/pytorch:2.6-{L4T_VERSION}-{CUDA_VERSION}-{LSB_RELEASE}',
+        'MINIMAL_BUILD': 'ON'
+    }
+)
+
+# Default package selection based on environment
+DEFAULT_PACKAGE = sesame_tts
+
+# If we're running standalone, print package info
+if __name__ == '__main__':
+    import json
+    print(json.dumps(DEFAULT_PACKAGE, indent=2))

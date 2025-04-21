@@ -1,91 +1,126 @@
-# Sesame TTS
+# Sesame CSM Text-to-Speech for Audiobooks
 
-A high-quality text-to-speech (TTS) container for NVIDIA Jetson platforms using the Sesame Conditional Speech Model (CSM).
+This container provides the Sesame CSM text-to-speech model optimized for audiobook generation on Jetson platforms. It is part of a larger audiobook generation project described in the [Audiobook Project Plan](../../audiobook-plan.md).
 
-## Overview
+## Features
 
-This package provides a TTS system based on Sesame AI Labs' CSM model, optimized for Jetson platforms running JetPack 6.1 or newer. It includes tools for generating audiobooks from text files and EPUB documents.
+- High-quality neural text-to-speech with natural prosody
+- Optimized for Jetson devices with CUDA acceleration
+- Support for long-form content like books and articles
+- Text segmentation with appropriate pauses and intonation
+- Audio watermarking capability
 
-## Key Features
+## Hardware Requirements
 
-- High-quality neural text-to-speech synthesis
-- Support for processing EPUB books
-- Audio watermarking capabilities
-- Complete audiobook pipeline with chapter extraction
+- NVIDIA Jetson device with JetPack 6.0+
+- Recommended: at least 8GB RAM
+- Recommended: NVMe storage for model files and audio output
+- CUDA 11.8 or higher
 
-## Model Information
+## Usage Examples
 
-This container requires the CSM-1B model to be downloaded separately. The model will be automatically loaded from the `/models/csm-1b-v1.0` directory if available.
-
-## Usage
-
-### Basic TTS Test
-
-To test that the TTS system is working:
+### Basic TTS Generation
 
 ```bash
-python /usr/local/bin/utils/test_csm.py
+# Run the container with interactive shell
+./jetson-containers run sesame-tts
+
+# Inside the container
+python3 -c "
+import sys
+sys.path.append('/opt/csm')
+from generator import load_csm_1b, Generator
+
+# Load model
+model = load_csm_1b(device='cuda')
+generator = Generator(model)
+
+# Generate speech
+audio = generator.generate_audio('Hello, this is a test of the Sesame text to speech system.')
+
+# Save to file
+generator.save_audio(audio, '/audiobook_data/test.wav')
+"
 ```
 
-This will generate a short audio sample using the CSM model.
-
-### Generating Audiobooks
-
-Generate an audiobook from a text file:
+### Processing an Ebook
 
 ```bash
-python /books/generate_audiobook_sesame.py /path/to/input.txt /path/to/output.wav
-```
-
-Generate an audiobook from an EPUB file:
-
-```bash
-python /books/generate_audiobook_sesame_epub.py /path/to/book.epub /path/to/output.wav
-```
-
-Extract chapters from an EPUB book:
-
-```bash
-python /books/extract_chapters.py /path/to/book.epub
-```
-
-### Volume Mounting
-
-When running the container, you'll typically want to mount three directories:
-
-- `/models` - For storing the CSM model files
-- `/books` - For input books (text/EPUB)
-- `/audiobook_data` - For output audio files
-
-Example:
-
-```bash
-jetson-containers run \
-  --volume /path/to/models:/models \
-  --volume /path/to/books:/books \
-  --volume /path/to/output:/audiobook_data \
+# Mount your books directory and output directory
+./jetson-containers run \
+  -v /path/to/your/books:/books \
+  -v /path/to/output:/audiobook_data \
   sesame-tts
+
+# Inside the container
+python3 -c "
+import sys
+sys.path.append('/opt/csm')
+from audiobook_generator import AudiobookGenerator
+
+# Initialize the generator
+generator = AudiobookGenerator(
+    model_device='cuda',
+    segment_length=1000,  # characters per segment
+    add_watermark=True
+)
+
+# Process a book
+generator.process_book(
+    book_path='/books/my_book.epub',
+    output_dir='/audiobook_data/my_book',
+    chapters=[1, 2, 3]  # optional: process specific chapters only
+)
+"
 ```
 
-## Resource Considerations
+## Environment Variables
 
-- **Memory Usage**: The CSM model requires at least 4GB of RAM to run efficiently
-- **Storage**: Ensure sufficient space for model files (~1GB) and generated audio
-- **Processing Speed**: TTS generation can be relatively slow on Jetson devices; expect around 3-5x realtime for audio generation
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MODELS_DIR` | Directory for storing model files | `/models` |
+| `AUDIOBOOK_DATA` | Directory for output audio files | `/audiobook_data` |
+| `BOOKS_DIR` | Directory for input books | `/books` |
+| `CUDA_MODULE_LOADING` | CUDA module loading mode | `LAZY` |
+| `TORCH_USE_CUDA_DSA` | Enable CUDA Direct System Access | `1` |
+
+## Performance Tips
+
+1. **Memory Management**: CSM models require significant GPU memory. If you experience out-of-memory errors:
+   - Reduce batch size
+   - Process shorter text segments
+   - Use a swap file on NVMe for additional memory
+
+2. **Storage Performance**: For processing long books:
+   - Use NVMe storage for both input and output to avoid SD card wear
+   - Pre-segment long texts into smaller chunks
+
+3. **Temperature and Throttling**: TTS generation is computationally intensive:
+   - Ensure adequate cooling for your Jetson device
+   - Consider adding a fan if running extended generation jobs
+   - Monitor thermal throttling with `tegrastats`
+
+4. **Throughput Optimization**:
+   - Process multiple short segments in parallel rather than sequential long segments
+   - Use the `--runtime nvidia` flag with Docker for best GPU performance
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Model Not Found**: Ensure the CSM model is downloaded and placed in `/models/csm-1b-v1.0`
-2. **CUDA Out of Memory**: Try reducing batch sizes or processing smaller text chunks
-3. **Audio Quality Issues**: Check your input text formatting; poor punctuation can affect speech quality
+- **Model Loading Fails**: Verify CUDA is available and check your device has sufficient memory
+- **Slow Generation**: Check for thermal throttling using `tegrastats`
+- **Audio Quality Issues**: Try different sampling rates (22050Hz or 44100Hz)
+- **Book Format Problems**: The container supports EPUB, PDF, and TXT formats. Convert other formats first
 
-### Log Location
+### Logs and Debugging
 
-Log files are written to `/audiobook_data/logs/` when generating audio.
+Enable verbose logging by setting the environment variable:
+```bash
+export CSM_DEBUG=1
+```
 
-## Further Reading
+## Resources
 
-- [Sesame AI Labs CSM Repository](https://github.com/SesameAILabs/csm)
-- [NVIDIA Jetson Documentation](https://docs.nvidia.com/jetson/)
+- [Sesame CSM GitHub Repository](https://github.com/SesameAILabs/csm)
+- [Jetson Containers Documentation](https://github.com/dusty-nv/jetson-containers)
