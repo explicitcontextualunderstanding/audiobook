@@ -88,7 +88,10 @@ RUN source /opt/conda/bin/activate tts && \
     --index-url https://pypi.jetson-ai-lab.dev/simple \
     --extra-index-url https://pypi.ngc.nvidia.com \
     --extra-index-url https://pypi.org/simple \
-    $(grep -vE "^\s*(#|$)" /tmp/requirements.txt)
+    $(grep -vE "^\s*(#|$)" /tmp/requirements.txt) || \
+    (echo "Attempting fallback installation for vector_quantize_pytorch" && \
+    pip install --no-cache-dir --prefer-binary \
+    "vector_quantize_pytorch @ git+https://github.com/lucidrains/vector-quantize-pytorch.git@v1.8.6")
 
 # Install specialized dependencies in a separate layer
 SHELL ["/bin/bash", "-c"]
