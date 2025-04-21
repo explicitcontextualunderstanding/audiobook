@@ -72,12 +72,12 @@ RUN source /opt/conda/bin/activate tts && \
 # Install the rest of the requirements (separated to leverage caching)
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
-    # Install general dependencies
+    # Install general dependencies, filtering out comments and empty lines
     pip install --no-cache-dir --prefer-binary \
     --index-url https://pypi.jetson-ai-lab.dev/simple \
     --extra-index-url https://pypi.ngc.nvidia.com \
     --extra-index-url https://pypi.org/simple \
-    $(grep -v "^torch\|^torchvision\|^torchaudio\|^torchao\|^torchtune\|^moshi" /tmp/requirements.txt)
+    $(grep -vE "^\s*(#|$)" /tmp/requirements.txt)
 
 # Install specialized dependencies in a separate layer
 SHELL ["/bin/bash", "-c"]
