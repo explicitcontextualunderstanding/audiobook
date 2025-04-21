@@ -7,15 +7,30 @@ ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
 # ============================================================================
 FROM ${BASE_IMAGE} AS resolver
 
-# Install pip-tools and git (git needed if any deps point to repos)
+# Install git and essential build tools needed for Miniconda setup and potential builds
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-pip \
-    git \
-    && pip3 install --no-cache-dir pip-tools \
+    git curl ca-certificates build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-# Configure pip to use the specific indices
-RUN mkdir -p ~/.config/pip && \
+# Install Miniconda
+ENV CONDA_DIR=/opt/conda
+RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -o Miniconda3.sh && \
+    bash Miniconda3.sh -b -p ${CONDA_DIR} && \
+    rm Miniconda3.sh && \
+    ${CONDA_DIR}/bin/conda config --set channel_priority flexible && \
+    ${CONDA_DIR}/bin/conda config --set pip_interop_enabled True && \
+    ${CONDA_DIR}/bin/conda config --add channels conda-forge && \
+    ${CONDA_DIR}/bin/conda clean -ya
+
+# Create the target Python environment and install pip-tools into it
+ENV PATH=${CONDA_DIR}/bin:${PATH}
+RUN conda create -y -n tts python=3.10 pip setuptools wheel && \
+    conda run -n tts pip install --no-cache-dir pip-tools && \
+    conda clean -ya
+
+# Configure pip within the tts environment to use the specific indices
+# Note: Conda run activates the env, ensuring pip.conf is placed correctly for that env's pip
+RUN conda run -n tts mkdir -p ~/.config/pip && \
     echo "[global]" > ~/.config/pip/pip.conf && \
     echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
     echo "extra-index-url = https://pypi.ngc.nvidia.com https://pypi.org/simple" >> ~/.config/pip/pip.conf && \
@@ -30,13 +45,13 @@ COPY ./requirements.in /app/requirements.in
 # Set WORKDIR after copying the file
 WORKDIR /app
 
-# Run pip-compile to resolve dependencies and create the lock file
+# Run pip-compile using the Python from the 'tts' conda environment
 # Using backtracking resolver for potentially better conflict handling
-RUN echo "Resolving dependencies..." && \
-    python3 -m piptools compile \
+RUN echo "Resolving dependencies using Python 3.10..." && \
+    /opt/conda/envs/tts/bin/python -m piptools compile \
       --resolver=backtracking \
       --output-file=requirements.lock.txt \
-      requirements.in # Now reads requirements.in from the current WORKDIR /app
+      requirements.in
 
 # --- End of Resolver Stage ---
 
