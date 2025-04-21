@@ -1,5 +1,5 @@
-# Optimized Dockerfile for faster build times with BuildKit
-# Use with: DOCKER_BUILDKIT=1 docker build -t sesame-tts-jetson .
+# Optimized Dockerfile for faster build times
+# Enable BuildKit: export DOCKER_BUILDKIT=1
 ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
 
 # ============================================================================
@@ -40,7 +40,7 @@ RUN conda config --set channel_priority flexible && \
     conda clean -ya
 
 # Copy requirements files
-COPY docker/sesame-tts/requirements.txt /tmp/requirements.txt
+COPY docker/sesame-tts/requirements.fast.txt /tmp/requirements.txt
 
 # Activate conda environment and install PyTorch dependencies
 SHELL ["/bin/bash", "-c"]

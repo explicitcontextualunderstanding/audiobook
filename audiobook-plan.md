@@ -335,17 +335,46 @@ Using pre-built Python wheels could potentially reduce build times, but several 
 
 4. **Jetson-specific Optimizations**: Some performance optimizations require specific compilation flags.
 
-### 9.2 Potential Solutions
+### 9.3 Optimized Build System
 
-1. **Jetson AI Lab PyPI Mirror**: The mirror at https://pypi.jetson-ai-lab.dev/simple hosts pre-built wheels optimized for Jetson devices.
+To address the long build times, the project now includes an optimized build system:
 
-2. **Multi-stage Docker Builds**: Separate build and runtime stages can help optimize the final image size.
+1. **Enhanced Dockerfile**: The Dockerfile has been optimized with:
+   - Multi-stage builds (dependencies → builder → runtime)
+   - Better layer caching through strategic command ordering
+   - Selective dependency installation for faster builds
+   - Proper separation of build-time and runtime components
 
-3. **Dependency Caching**: Pre-building and caching slow-to-build dependencies like torchao.
+2. **Optimized Requirements**: The requirements.txt file has been reorganized to:
+   - Install PyTorch stack first to leverage caching
+   - Separate specialized dependencies that may require compilation
+   - Group related dependencies for clearer organization
 
-4. **Optimized Layer Ordering**: Restructuring the Dockerfile to better leverage Docker's layer caching.
+3. **Improved .dockerignore**: More comprehensive exclusions to reduce context size
 
-See the [Build Validation Plan](build-validation.md) for detailed steps to validate these approaches and measure their effectiveness.
+4. **BuildKit-enabled Build Script**: A new build.sh script that provides:
+   - Parallel processing with BuildKit
+   - Progress indicators during builds
+   - Cache utilization for faster repeat builds
+   - Build time tracking and logs
+
+To use the optimized build system:
+
+```bash
+# Make the script executable (first time only)
+chmod +x build.sh
+
+# Basic build
+./build.sh
+
+# Advanced options
+./build.sh --verbose              # Show detailed output
+./build.sh --no-cache             # Force clean build
+./build.sh --cache-from=IMAGE     # Use previous build as cache
+./build.sh --tag=NAME             # Specify custom image tag
+```
+
+This approach significantly reduces build times, especially for subsequent builds where the cache can be utilized effectively.
 
 ## 10. Future Improvements
 

@@ -1,11 +1,12 @@
 #!/bin/bash
-# Build script for Docker images with BuildKit and optimized caching
-# Make this script executable with: chmod +x build.sh
+# Make this script executable with: chmod +x scripts/fast-build.sh
+# Fast build script for Docker images with BuildKit and caching
+# Usage: ./scripts/fast-build.sh
 
 set -eo pipefail  # Exit on error, but allow pipes to fail independently
 
 # Ensure we're in the project root directory
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 PROJECT_ROOT=$(pwd)
 
 # Enable BuildKit
@@ -19,8 +20,8 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 # Parse command-line arguments
-DOCKERFILE="docker/sesame-tts/Dockerfile"
-IMAGE_TAG="sesame-tts-jetson:latest"
+DOCKERFILE="docker/sesame-tts/Dockerfile.fast"
+IMAGE_TAG="sesame-tts-jetson:fast"
 CACHE_FROM=""
 NO_CACHE=false
 VERBOSE=false
@@ -48,36 +49,26 @@ for arg in "$@"; do
       CACHE_FROM="${arg#*=}"
       shift
       ;;
-    --help)
-      echo "Optimized build script for Docker images with BuildKit and caching"
-      echo
-      echo "Usage: ./build.sh [options]"
-      echo
-      echo "Options:"
-      echo "  --tag=NAME          Specify a custom tag for the image (default: sesame-tts-jetson:latest)"
-      echo "  --dockerfile=PATH   Specify a custom Dockerfile path (default: docker/sesame-tts/Dockerfile)"
-      echo "  --cache-from=IMAGE  Use specified image as cache source"
-      echo "  --no-cache          Build without using Docker cache"
-      echo "  --verbose           Show detailed build output"
-      echo "  --help              Show this help message"
-      echo
-      echo "Examples:"
-      echo "  ./build.sh"
-      echo "  ./build.sh --tag=sesame-tts:custom"
-      echo "  ./build.sh --cache-from=sesame-tts-jetson:latest"
-      exit 0
-      ;;
     *)
       # Unknown option
       ;;
   esac
 done
 
-echo -e "${BLUE}=== Optimized Build Script for Audiobook TTS ===${NC}"
+echo -e "${BLUE}=== Fast Build Script for Audiobook TTS ===${NC}"
 echo -e "${BLUE}Using BuildKit and optimized caching${NC}"
 echo
 
-# Ensure the Dockerfile exists
+# Make sure the .dockerignore file is present
+if [ ! -f "$PROJECT_ROOT/.dockerignore.fast" ]; then
+    echo -e "${YELLOW}Warning: .dockerignore.fast file not found${NC}"
+    echo -e "${YELLOW}Using existing .dockerignore file${NC}"
+else
+    echo -e "${GREEN}Using fast .dockerignore for faster builds${NC}"
+    cp "$PROJECT_ROOT/.dockerignore.fast" "$PROJECT_ROOT/.dockerignore"
+fi
+
+# Ensure the optimized Dockerfile exists
 if [ ! -f "$PROJECT_ROOT/$DOCKERFILE" ]; then
     echo -e "${RED}Error: Dockerfile not found at $DOCKERFILE${NC}"
     exit 1
@@ -191,7 +182,7 @@ echo
 # Save the image to cache for future builds (optional)
 if [ -z "$CACHE_FROM" ]; then
     echo -e "${BLUE}Tip: For faster future builds, use:${NC}"
-    echo -e "${YELLOW}./build.sh --cache-from=$IMAGE_TAG${NC}"
+    echo -e "${YELLOW}./scripts/fast-build.sh --cache-from=$IMAGE_TAG${NC}"
 fi
 
 exit 0
