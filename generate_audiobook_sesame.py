@@ -323,7 +323,7 @@ def main(args):
         print(f"Processing batch {batch_idx+1}/{batch_count} ({len(batch)} chunks)")
         
         for i, chunk in enumerate(tqdm(batch, desc=f"Synthesizing Batch {batch_idx+1}")):
-            overall_idx = batch_idx * args.max_batch_size + i
+            overall_idx = batch_idx * args.max_batch_size + i if args.max_batch_size > 0 else i
             chunk_filename = os.path.join(temp_dir, "chunk_{:04d}.wav".format(overall_idx))
             
             if os.path.exists(chunk_filename) and os.path.getsize(chunk_filename) > 0:
