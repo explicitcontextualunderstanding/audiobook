@@ -62,17 +62,14 @@ RUN chmod +x /opt/install_deps.sh && /opt/install_deps.sh
 # Copy requirements files
 COPY requirements.txt /tmp/requirements.txt
 
-# Install Triton separately first, forcing the specific Jetson index subdirectory
+# Install Triton separately first by downloading the wheel directly
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
-    echo "Temporarily disabling global pip config..." && \
-    mv ~/.config/pip/pip.conf ~/.config/pip/pip.conf.bak && \
-    echo "Attempting to install Triton from Jetson AI Lab index subdirectory ONLY..." && \
-    pip install --no-cache-dir \
-    --index-url https://pypi.jetson-ai-lab.dev/jp6/cu128/ \
-    triton==2.1.0 && \
-    echo "Restoring global pip config..." && \
-    mv ~/.config/pip/pip.conf.bak ~/.config/pip/pip.conf
+    echo "Downloading Triton 2.1.0 wheel directly..." && \
+    wget https://pypi.jetson-ai-lab.dev/jp6/cu128/triton/triton-2.1.0-cp310-cp310-linux_aarch64.whl -O /tmp/triton.whl && \
+    echo "Installing downloaded Triton wheel..." && \
+    pip install --no-cache-dir /tmp/triton.whl && \
+    rm /tmp/triton.whl
 
 # Install remaining Python dependencies from the requirements file using all configured indices
 SHELL ["/bin/bash", "-c"]
