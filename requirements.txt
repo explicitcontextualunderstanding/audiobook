@@ -46,5 +46,5 @@ torchtune==0.3.0
 moshi==0.2.2
 # Watermarking/Encryption - Installing from PyPI as per original repo README
 silentcipher>=1.0.1 # Assuming >=1.0.1 based on previous attempts, adjust if needed
-# Triton Inference Server client/utils (needed for torchao kernels?) - No specific version pinned yet
-triton
+# Triton Inference Server client/utils (needed for torchao kernels?) - Pinning to Jetson AI Lab version
+triton==2.1.0
