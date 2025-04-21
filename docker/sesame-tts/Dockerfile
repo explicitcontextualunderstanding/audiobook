@@ -62,23 +62,23 @@ RUN chmod +x /opt/install_deps.sh && /opt/install_deps.sh
 # Copy requirements files
 COPY requirements.txt /tmp/requirements.txt
 
-# Install Python dependencies from the updated requirements file (excluding triton)
+# Install Triton separately first, forcing the Jetson index
 SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
-    echo "Installing Python dependencies from requirements.txt..." && \
+    echo "Attempting to install Triton from Jetson AI Lab index..." && \
+    pip install --no-cache-dir \
+    --index-url https://pypi.jetson-ai-lab.dev/simple \
+    triton==2.1.0
+
+# Install remaining Python dependencies from the requirements file
+SHELL ["/bin/bash", "-c"]
+RUN source /opt/conda/bin/activate tts && \
+    echo "Installing remaining Python dependencies from requirements.txt..." && \
     pip install --no-cache-dir \
     --index-url https://pypi.jetson-ai-lab.dev/simple \
     --extra-index-url https://pypi.ngc.nvidia.com \
     --extra-index-url https://pypi.org/simple \
     -r /tmp/requirements.txt
-
-# Install triton separately from the Jetson AI Lab index
-SHELL ["/bin/bash", "-c"]
-RUN source /opt/conda/bin/activate tts && \
-    echo "Installing triton from Jetson AI Lab index..." && \
-    pip install --no-cache-dir \
-    --index-url https://pypi.jetson-ai-lab.dev/simple \
-    triton==2.1.0
 
 # Verify critical imports to ensure dependencies are correctly installed
 SHELL ["/bin/bash", "-c"]
