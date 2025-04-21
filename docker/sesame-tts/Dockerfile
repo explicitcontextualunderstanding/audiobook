@@ -22,10 +22,13 @@ RUN mkdir -p ~/.config/pip && \
     echo "timeout = 120" >> ~/.config/pip/pip.conf && \
     echo "retries = 5" >> ~/.config/pip/pip.conf
 
-# Ensure the target directory exists and set it as WORKDIR
+# Ensure the target directory exists
 RUN mkdir -p /app
+# Copy the requirements file directly to the target path
+COPY ./requirements.in /app/requirements.in # Explicitly copy to full path
+
+# Set WORKDIR after copying the file
 WORKDIR /app
-COPY ./requirements.in . # Explicitly reference file from context root
 
 # Run pip-compile to resolve dependencies and create the lock file
 # Using backtracking resolver for potentially better conflict handling
@@ -33,7 +36,7 @@ RUN echo "Resolving dependencies..." && \
     python3 -m piptools compile \
       --resolver=backtracking \
       --output-file=requirements.lock.txt \
-      requirements.in
+      requirements.in # Now reads requirements.in from the current WORKDIR /app
 
 # --- End of Resolver Stage ---
 
