@@ -70,54 +70,97 @@ DOCKER_BUILDKIT=1 docker build -t sesame-tts-jetson -f docker/sesame-tts/Dockerf
 ### 2.2 Dependency Management Evolution
 Our dependency management strategy has evolved to address several challenges:
 
-#### 2.2.1 Key Python Package Dependencies
-- **Vector Quantize PyTorch**: We've resolved installation issues by updating from version 1.8.6 to 1.22.15, removing the need for complex fallback mechanisms.
-- **Einops**: Updated from 0.7.0 to >=0.8.0 to resolve compatibility issues.
-- **SilentCipher**: Switched from git-based installation to PyPI package (>=1.0.1).
-- **Specialized Packages**: Core packages like `torchao`, `torchtune`, and `moshi` remain pinned to specific versions for stability.
+#### 2.2.1 Critical Version Mismatch Issues
 
-#### 2.2.2 Recommended requirements.txt Configuration
+We've identified critical version mismatches between our pinned requirements and what's available on the Jetson PyPI index:
+
+| Package | In requirements.txt | Available on Jetson Index |
+|---------|---------------------|---------------------------|
+| torch | 2.2.0 | 2.7.0 |
+| torchvision | 0.17.0 | 0.22.0 |
+| torchaudio | 2.2.0 | 2.7.0 |
+| torchao | 0.1.0 | 0.11.0+ |
+| triton | 2.1.0 | 3.3.0 |
+
+**Important**: Due to these mismatches, pinned packages may be sourced from standard PyPI or NGC repositories instead of the Jetson-optimized index, potentially leading to:
+- Installation failures for ARM64 architecture
+- Sub-optimal performance
+- Missing hardware acceleration
+
+#### 2.2.2 Recommended Approach for requirements.txt
+
+**Option 1**: Use the Jetson-optimized versions (higher performance but less tested):
 ```
-# Core PyTorch - installed separately in Dockerfile
-torch==2.6.0
+# Core PyTorch - use Jetson-optimized versions
+torch==2.7.0
+torchvision==0.22.0
+torchaudio==2.7.0
+torchao==0.11.0
+triton==3.3.0
+
+# Keep other critical dependencies at tested versions
+vector_quantize_pytorch==1.22.15
+torchtune==0.3.0
+moshi==0.2.2
+```
+
+**Option 2**: Create a requirements.lock.txt file to ensure reproducible builds:
+```
+# Core dependencies pinned to tested versions
+torch==2.2.0
 torchvision==0.17.0
-torchaudio==2.6.0
+torchaudio==2.2.0
+vector_quantize_pytorch==1.22.15
+tokenizers==0.13.3
+transformers==4.31.0
+huggingface_hub==0.16.4
+accelerate==0.25.0
+soundfile==0.12.1
+pydub==0.25.1
+sounddevice==0.5.0
+ebooklib==0.18.0
+beautifulsoup4==4.12.2
+PyPDF2==3.0.1
+pdfminer.six==20221105
+nltk==3.8.1
+librosa==0.10.1
+einops==0.8.0
+torchao==0.1.0
+torchtune==0.3.0
+moshi==0.2.2
+silentcipher==1.0.1
+triton==2.1.0
 
-# Transformers & Tokenizers - minimal versions to reduce download size
-tokenizers>=0.13.3
-transformers>=4.31.0
-huggingface_hub>=0.16.4
-accelerate>=0.25.0
+# Common transitive dependencies (not exhaustive)
+numpy==1.26.0
+packaging==23.2
+pillow==10.1.0
+tqdm==4.66.1
+psutil==5.9.6
+```
 
-# Audio processing
-soundfile>=0.12.1
-pydub>=0.25.1
-sounddevice>=0.5.0
+#### 2.2.3 Custom PyPI Index Configuration
 
-# Text extraction & NLP
-ebooklib>=0.18.0
-beautifulsoup4>=4.12.2
-PyPDF2>=3.0.1
-pdfminer.six>=20221105
-nltk>=3.8.1
+For better control over package sources, modify the Dockerfile to explicitly specify indices:
 
-# Core packages with specific version requirements
-vector_quantize_pytorch==1.22.15  # Must use this version for compatibility
-torchtune==0.3.0                  # Performance-critical component
-torchao==0.1.0                    # Performance-critical component
-moshi==0.2.2                      # Required for model interface
-silentcipher>=1.0.1               # Now available via PyPI
-librosa>=0.10.1                   # Required by silentcipher
+```bash
+# Configure pip for faster installations
+RUN mkdir -p ~/.config/pip && \
+    echo "[global]" > ~/.config/pip/pip.conf && \
+    echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
+    echo "extra-index-url = https://pypi.ngc.nvidia.com https://pypi.org/simple" >> ~/.config/pip/pip.conf && \
+    echo "timeout = 60" >> ~/.config/pip/pip.conf && \
+    echo "retries = 3" >> ~/.config/pip/pip.conf
+```
 
-# Other utilities
-einops>=0.8.0                    # Updated for compatibility
-sphn>=0.1.4
-rotary_embedding_torch>=0.2.5
-datasets>=2.16.1
+Or use the `--index-url` flags directly with pip in the Dockerfile:
 
-# System utils
-tqdm>=4.66.1
-psutil>=5.9.6
+```bash
+pip install --no-cache-dir --prefer-binary \
+    --index-url https://pypi.jetson-ai-lab.dev/simple \
+    --extra-index-url https://pypi.ngc.nvidia.com \
+    --extra-index-url https://pypi.org/simple \
+    -r requirements.txt
 ```
 
 ### 2.3 Multi-Stage Docker Build
@@ -224,32 +267,38 @@ Based on our development history, here are common issues and solutions:
 
 If you encounter package installation failures:
 
-1. **Check Base Image Availability**:
+1. **Version Mismatch Issues**:
+   The most likely cause of build failures is the version mismatch between your requirements.txt and the Jetson-optimized index. Consider:
+   - Using the latest Jetson-optimized versions instead of pinned versions
+   - Using a base image with pre-installed PyTorch compatible with your requirements
+   - Checking for ARM64-compatible wheels for your pinned versions
+
+2. **Check Base Image Availability**:
    ```bash
    docker pull dustynv/pytorch:2.6-r36.4.0-cu128-24.04
    ```
 
-2. **Network/PyPI Mirror Issues**:
+3. **Network/PyPI Mirror Issues**:
    If the Jetson-specific PyPI mirrors are inaccessible, modify the Dockerfile to use standard PyPI:
    ```bash
    # Comment out this line:
    # echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf
    ```
 
-3. **Architecture Issues**:
+4. **Architecture Issues**:
    If building on an x86 machine for Jetson (ARM64), use cross-platform building:
    ```bash
    docker buildx create --use
    docker buildx build --platform linux/arm64 -t sesame-tts-jetson .
    ```
 
-4. **Debug Specific Stage**:
+5. **Debug Specific Stage**:
    Target a specific build stage to identify where the failure occurs:
    ```bash
    docker build --target dependencies -t sesame-tts-deps .
    ```
 
-5. **Verbose Output**:
+6. **Verbose Output**:
    Use verbose output to see detailed error messages:
    ```bash
    DOCKER_BUILDKIT=1 docker build --progress=plain -t sesame-tts-jetson .
@@ -275,6 +324,7 @@ Planned improvements for the project include:
 5. **Chapter Metadata**: Adding chapter metadata to the generated MP3 files for better navigation.
 6. **Further Build Optimization**: Continue refining dependency management and build process based on our learnings.
 7. **Cross-Platform Support**: Improve compatibility across different host architectures.
+8. **Dependency Harmonization**: Better align our package version requirements with the Jetson-optimized PyPI index.
 
 ## 7. License
 
