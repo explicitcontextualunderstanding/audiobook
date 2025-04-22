@@ -1,4 +1,17 @@
 #!/bin/bash
+# --- Docker permission check ---
+if ! [ -S /var/run/docker.sock ]; then
+    echo "ERROR: Docker socket /var/run/docker.sock not found."
+    exit 1
+fi
+if ! docker info > /dev/null 2>&1; then
+    echo "ERROR: permission denied accessing Docker daemon."
+    echo "→ Use sudo or add your user to the 'docker' group:"
+    echo "     sudo usermod -aG docker \$USER && newgrp docker"
+    exit 1
+fi
+# --- end pre-check ---
+
 # Make sure the script is executable
 # extract_during_build.sh
 # Extracts dependency information during the build process
