@@ -21,7 +21,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 # Install essential tools for dependency analysis
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-pip git curl wget && \
+    python3-pip git curl wget graphviz && \
     pip3 install --no-cache-dir pip-tools pipdeptree && \
     rm -rf /var/lib/apt/lists/*
 
@@ -168,6 +168,7 @@ RUN cp /dependency_analysis/requirements.in /dependency_analysis/recommended_req
 RUN echo '#!/bin/bash' > /extract_analysis.sh && \
     echo 'mkdir -p /output' >> /extract_analysis.sh && \
     echo 'cp -r /dependency_analysis/* /output/' >> /extract_analysis.sh && \
+    echo 'cp dependency_tree.dot dependency_tree.png /output/' >> /extract_analysis.sh && \
     echo 'echo "Dependency analysis results extracted to /output"' >> /extract_analysis.sh && \
     chmod +x /extract_analysis.sh
 
