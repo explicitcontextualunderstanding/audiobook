@@ -42,7 +42,7 @@ RUN mkdir -p ~/.config/pip && \
     echo "retries = 5" >> ~/.config/pip/pip.conf
 
 # Copy requirements.in file 
-COPY docker/sesame-tts/requirements.in /tmp/requirements.in
+COPY requirements.in /tmp/requirements.in
 
 # Generate the lock file with backtracking resolver
 RUN pip-compile --resolver=backtracking --output-file=/tmp/requirements.lock.txt /tmp/requirements.in && \
@@ -67,7 +67,8 @@ ENV PYTHONUNBUFFERED=1 \
     TORCH_USE_CUDA_DSA=1 \
     CARGO_HOME=/root/.cargo \
     PATH="/root/.cargo/bin:/opt/conda/bin:$PATH" \
-    TORCH_CUDA_ARCH_LIST="8.7"  # Set CUDA architecture for Jetson Orin
+    # Set CUDA architecture for Jetson Orin
+    TORCH_CUDA_ARCH_LIST="8.7"
 
 # Install only essential system dependencies in a single layer
 RUN apt-get update && apt-get install -y --no-install-recommends \
