@@ -1,6 +1,5 @@
 #!/bin/bash
-# Make the script executable
-chmod +x "$0"
+# Make sure the script is executable
 # extract_during_build.sh
 # Extracts dependency information during the build process
 # This is useful when the main container build fails due to dependency conflicts
