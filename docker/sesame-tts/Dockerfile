@@ -7,15 +7,19 @@ ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
 # ============================================================================
 FROM ${BASE_IMAGE} AS resolver
 
-# Install git, essential build tools, rust, and pip-tools
-# Note: Installing pip-tools via apt might install an older version.
-# Consider installing via pip within the conda env later if needed.
+# Install git, essential build tools, and pip-tools
+# Remove rustc cargo from apt-get
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git curl ca-certificates build-essential \
-    rustc cargo \
     python3-pip \
     && pip3 install --no-cache-dir pip-tools \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Rust using rustup
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
+    # Verify cargo installation
+    cargo --version
 
 # Configure pip globally within the resolver stage (will be overridden in conda env)
 # This helps if pip-tools itself needs specific indices initially.
@@ -79,6 +83,7 @@ SHELL ["/bin/bash", "-c"]
 FROM ${BASE_IMAGE} AS dependencies
 
 # Set environment variables for build optimization
+# Add CARGO_HOME and update PATH for Rust
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -89,15 +94,20 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_DEFAULT_TIMEOUT=100 \
     CUDA_MODULE_LOADING=LAZY \
     TORCH_USE_CUDA_DSA=1 \
-    # Ensure conda is in PATH
-    PATH="/opt/conda/bin:$PATH"
+    CARGO_HOME=/root/.cargo \
+    # Ensure conda and cargo are in PATH
+    PATH="/root/.cargo/bin:/opt/conda/bin:$PATH"
 
 # Install only essential system dependencies in a single layer
+# Remove rustc cargo from apt-get
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget curl git ca-certificates build-essential python3-dev software-properties-common \
-    # Add rustc and cargo here as well if any package needs runtime compilation
-    rustc cargo \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Rust using rustup
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
+    # Verify cargo installation
+    cargo --version
 
 # Configure pip for faster installations (still useful for conda/other installs)
 RUN mkdir -p ~/.config/pip && \
