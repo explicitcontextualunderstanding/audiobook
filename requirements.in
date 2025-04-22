@@ -7,15 +7,13 @@
 torch==2.7.0
 torchvision==0.22.0
 torchaudio==2.7.0
--moshi==0.2.2  # Commented out due to requiring torch<2.7
-+moshi @ git+https://github.com/kyutai-labs/moshi.git@main#egg=moshi
+moshi @ git+https://github.com/kyutai-labs/moshi.git@main#egg=moshi
 
 # OPTION 2: Use slightly older torch compatible with moshi
 # torch==2.2.0
 # torchvision==0.17.0
 # torchaudio==2.2.0
--# moshi==0.2.2  # Required by original Sesame CSM
-+# moshi==0.2.2  # replaced by VCS install above
+# moshi==0.2.2   # Required by original Sesame CSM
 
 # Remaining dependencies - common to both approaches
 # Core ML Framework - Aligning with Jetson Index (JP6/cu128) 
