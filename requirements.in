@@ -7,7 +7,7 @@
 torch==2.7.0
 torchvision==0.22.0
 torchaudio==2.7.0
-moshi @ git+https://github.com/kyutai-labs/moshi.git@main#egg=moshi
+moshi @ git+https://github.com/kyutai-labs/moshi.git@main#subdirectory=moshi
 
 # OPTION 2: Use slightly older torch compatible with moshi
 # torch==2.2.0
