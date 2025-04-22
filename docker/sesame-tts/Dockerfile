@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Rust (needed for some packages)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    . "$HOME/.cargo/env" && \
     rustup default stable && \
     rustup update && \
     cargo --version
@@ -77,6 +78,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Rust (needed for some packages)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    . "$HOME/.cargo/env" && \
     rustup default stable && \
     rustup update && \
     cargo --version
