@@ -161,6 +161,9 @@ RUN echo "# Dependency Analysis Report" > analysis_report.md && \
     echo "" >> analysis_report.md && \
     echo "3. Install packages in smaller groups to isolate failures" >> analysis_report.md
 
+# Export the base requirements as the recommended requirements file
+RUN cp /dependency_analysis/requirements.in /dependency_analysis/recommended_requirements.in
+
 # Create extraction script
 RUN echo '#!/bin/bash' > /extract_analysis.sh && \
     echo 'mkdir -p /output' >> /extract_analysis.sh && \
