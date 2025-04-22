@@ -45,4 +45,4 @@ torchtune==0.3.0
 # Model serialization (Sesame specific?) - Pinned for specific CSM features/compatibility
 moshi==0.2.2
 # Watermarking/Encryption - Installing from PyPI as per original repo README
-silentcipher>=1.0.1
+# silentcipher>=1.0.1 # Removed due to torch==2.2.0 conflict

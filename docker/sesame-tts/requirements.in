@@ -1,0 +1,43 @@
+# Core PyTorch - using Jetson-optimized versions
+torch>=2.7.0
+torchvision>=0.22.0
+torchaudio>=2.7.0
+
+# Libraries with specific version requirements - using Jetson-optimized where available
+vector_quantize_pytorch>=1.22.15
+torchtune>=0.3.0
+torchao>=0.11.0
+moshi>=0.2.2
+triton>=3.3.0
+
+# Updated other critical dependencies for better compatibility
+einops>=0.8.0
+silentcipher>=1.0.1
+librosa>=0.10.1
+
+# Transformers & Tokenizers - minimal versions to reduce download size
+tokenizers>=0.13.3
+transformers>=4.31.0
+huggingface_hub>=0.16.4
+accelerate>=0.25.0
+
+# Audio processing
+soundfile>=0.12.1
+pydub>=0.25.1
+sounddevice>=0.5.0
+
+# Text extraction & NLP
+ebooklib>=0.18.0
+beautifulsoup4>=4.12.2
+PyPDF2>=3.0.1
+pdfminer.six>=20221105
+nltk>=3.8.1
+
+# Other utilities
+sphn>=0.1.4
+rotary_embedding_torch>=0.2.5
+datasets>=2.16.1
+
+# System utils
+tqdm>=4.66.1
+psutil>=5.9.6

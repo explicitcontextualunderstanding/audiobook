@@ -1,4 +1,6 @@
 #!/bin/bash
+# Make the script executable
+chmod +x "$0"
 # analyze_dependencies.sh
 # A tool for analyzing Python dependencies in the audiobook project
 

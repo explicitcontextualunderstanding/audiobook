@@ -3,87 +3,11 @@
 ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
 
 # ============================================================================
-# RESOLVER STAGE: Generate the requirements.lock.txt file
+# RESOLVER STAGE: Generate the lock file to capture all dependencies
 # ============================================================================
 FROM ${BASE_IMAGE} AS resolver
 
-# Install git, essential build tools, and pip-tools
-# Remove rustc cargo from apt-get
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl ca-certificates build-essential \
-    python3-pip \
-    && pip3 install --no-cache-dir pip-tools \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Rust using rustup
-ENV PATH="/root/.cargo/bin:${PATH}"
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
-    # Verify cargo installation
-    cargo --version
-
-# Configure pip globally within the resolver stage (will be overridden in conda env)
-# This helps if pip-tools itself needs specific indices initially.
-RUN mkdir -p ~/.config/pip && \
-    echo "[global]" > ~/.config/pip/pip.conf && \
-    echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
-    echo "extra-index-url = https://pypi.ngc.nvidia.com https://pypi.org/simple" >> ~/.config/pip/pip.conf && \
-    echo "timeout = 120" >> ~/.config/pip/pip.conf && \
-    echo "retries = 5" >> ~/.config/pip/pip.conf
-
-# Install Miniconda
-ENV CONDA_DIR=/opt/conda
-ENV PATH=${CONDA_DIR}/bin:${PATH}
-RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -o Miniconda3.sh && \
-    bash Miniconda3.sh -b -p ${CONDA_DIR} && \
-    rm Miniconda3.sh && \
-    ${CONDA_DIR}/bin/conda config --set channel_priority flexible && \
-    ${CONDA_DIR}/bin/conda config --set pip_interop_enabled True && \
-    ${CONDA_DIR}/bin/conda config --add channels conda-forge && \
-    ${CONDA_DIR}/bin/conda clean -ya
-
-# Create the target Python environment
-RUN conda create -y -n tts python=3.10 pip setuptools wheel && \
-    conda clean -ya
-
-# Configure pip *within* the tts environment (overrides global)
-# Use conda run to execute commands within the environment
-RUN conda run -n tts /bin/bash -c '\
-    mkdir -p ~/.config/pip && \
-    echo "[global]" > ~/.config/pip/pip.conf && \
-    echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
-    echo "extra-index-url = https://pypi.ngc.nvidia.com https://pypi.org/simple" >> ~/.config/pip/pip.conf && \
-    echo "timeout = 120" >> ~/.config/pip/pip.conf && \
-    echo "retries = 5" >> ~/.config/pip/pip.conf'
-
-# Ensure the target directory exists and copy requirements.in
-RUN mkdir -p /app
-COPY ./requirements.in /app/requirements.in
-WORKDIR /app
-
-# Run pip-compile using the Python from the 'tts' conda environment
-# Use SHELL to ensure commands run within the activated conda environment
-SHELL ["/opt/conda/bin/conda", "run", "-n", "tts", "/bin/bash", "-c"]
-RUN echo "Installing pip-tools inside conda env just in case..." && \
-    pip install --no-cache-dir pip-tools && \
-    echo "Resolving dependencies for Python 3.10 using pip-compile..." && \
-    pip-compile \
-      --resolver=backtracking \
-      --output-file=requirements.lock.txt \
-      --verbose \
-      requirements.in
-# Reset SHELL to default
-SHELL ["/bin/bash", "-c"]
-
-# --- End of Resolver Stage ---
-
-
-# ============================================================================
-# DEPENDENCIES STAGE: Cache dependency installation USING the lock file
-# ============================================================================
-FROM ${BASE_IMAGE} AS dependencies
-
 # Set environment variables for build optimization
-# Add CARGO_HOME and update PATH for Rust
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
@@ -95,27 +19,74 @@ ENV PYTHONUNBUFFERED=1 \
     CUDA_MODULE_LOADING=LAZY \
     TORCH_USE_CUDA_DSA=1 \
     CARGO_HOME=/root/.cargo \
-    # Ensure conda and cargo are in PATH
     PATH="/root/.cargo/bin:/opt/conda/bin:$PATH"
 
-# Install only essential system dependencies in a single layer
-# Remove rustc cargo from apt-get
+# Install pip-tools for dependency resolution and other essential tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    wget curl git ca-certificates build-essential python3-dev software-properties-common \
-    && rm -rf /var/lib/apt/lists/*
+    wget curl git ca-certificates build-essential python3-pip && \
+    pip3 install --no-cache-dir pip-tools && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install Rust using rustup
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable && \
-    # Verify cargo installation
+# Install Rust (needed for some packages)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    rustup default stable && \
+    rustup update && \
     cargo --version
 
-# Configure pip for faster installations (still useful for conda/other installs)
+# Configure pip to use Jetson-optimized wheels
 RUN mkdir -p ~/.config/pip && \
     echo "[global]" > ~/.config/pip/pip.conf && \
     echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
     echo "extra-index-url = https://pypi.ngc.nvidia.com https://pypi.org/simple" >> ~/.config/pip/pip.conf && \
-    echo "timeout = 60" >> ~/.config/pip/pip.conf && \
-    echo "retries = 3" >> ~/.config/pip/pip.conf
+    echo "timeout = 120" >> ~/.config/pip/pip.conf && \
+    echo "retries = 5" >> ~/.config/pip/pip.conf
+
+# Copy requirements.in file 
+COPY docker/sesame-tts/requirements.in /tmp/requirements.in
+
+# Generate the lock file with backtracking resolver
+RUN pip-compile --resolver=backtracking --output-file=/tmp/requirements.lock.txt /tmp/requirements.in && \
+    # Verify the lock file was created
+    test -f /tmp/requirements.lock.txt || (echo "Failed to generate requirements.lock.txt" && exit 1)
+
+# ============================================================================
+# DEPENDENCIES STAGE: Install all dependencies from wheels
+# ============================================================================
+FROM ${BASE_IMAGE} AS dependencies
+
+# Set environment variables for build optimization
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    NO_TORCH_COMPILE=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    CONDA_DIR=/opt/conda \
+    PYTHONHASHSEED=0 \
+    PIP_DEFAULT_TIMEOUT=100 \
+    CUDA_MODULE_LOADING=LAZY \
+    TORCH_USE_CUDA_DSA=1 \
+    CARGO_HOME=/root/.cargo \
+    PATH="/root/.cargo/bin:/opt/conda/bin:$PATH" \
+    TORCH_CUDA_ARCH_LIST="8.7"  # Set CUDA architecture for Jetson Orin
+
+# Install only essential system dependencies in a single layer
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    wget curl git ca-certificates build-essential python3-dev software-properties-common && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install Rust (needed for some packages)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
+    rustup default stable && \
+    rustup update && \
+    cargo --version
+
+# Configure pip for faster installations with Jetson-optimized wheels
+RUN mkdir -p ~/.config/pip && \
+    echo "[global]" > ~/.config/pip/pip.conf && \
+    echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
+    echo "extra-index-url = https://pypi.ngc.nvidia.com https://pypi.org/simple" >> ~/.config/pip/pip.conf && \
+    echo "timeout = 120" >> ~/.config/pip/pip.conf && \
+    echo "retries = 5" >> ~/.config/pip/pip.conf
 
 # Install Miniconda and set up the environment
 RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -o Miniconda3.sh && \
@@ -127,7 +98,7 @@ RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch
     /opt/conda/bin/conda create -y -n tts python=3.10 pip setuptools wheel && \
     /opt/conda/bin/conda clean -ya
 
-# Install ffmpeg separately if not found in Conda
+# Install ffmpeg
 RUN /opt/conda/bin/conda install -n tts -y -c conda-forge ffmpeg || \
     (apt-get update && \
     apt-get install -y --no-install-recommends software-properties-common && \
@@ -137,28 +108,37 @@ RUN /opt/conda/bin/conda install -n tts -y -c conda-forge ffmpeg || \
     apt-get clean && rm -rf /var/lib/apt/lists/*) || \
     (echo "Failed to install ffmpeg. Please check your repositories and try again." && exit 1)
 
-# Copy the dependency installation script into the container
-COPY docker/sesame-tts/install_deps.sh /opt/install_deps.sh
-RUN chmod +x /opt/install_deps.sh && /opt/install_deps.sh
+# Copy the lock file from the resolver stage
+COPY --from=resolver /tmp/requirements.lock.txt /tmp/requirements.lock.txt
 
-# --- Use the generated lock file ---
-# Copy the lock file generated by the 'resolver' stage
-COPY --from=resolver /app/requirements.lock.txt /tmp/requirements.lock.txt
-
-# Install Python dependencies EXACTLY using the lock file
+# Install Python dependencies using the lock file with BuildKit caching
 SHELL ["/bin/bash", "-c"]
-RUN source /opt/conda/bin/activate tts && \
-    echo "Installing locked Python dependencies from requirements.lock.txt..." && \
-    pip install --no-cache-dir \
-      -r /tmp/requirements.lock.txt # Install using the lock file
+RUN --mount=type=cache,target=/root/.cache/pip \
+    source /opt/conda/bin/activate tts && \
+    echo "Installing Python dependencies from lock file..." && \
+    pip install --no-cache-dir --prefer-binary -r /tmp/requirements.lock.txt && \
+    # Install pipdeptree for dependency documentation
+    pip install --no-cache-dir pipdeptree && \
+    # Generate dependency documentation
+    mkdir -p /opt/dependency_docs && \
+    pipdeptree --json-tree > /opt/dependency_docs/dependency_tree.json && \
+    pip freeze > /opt/dependency_docs/frozen_deps.txt
 
 # Verify critical imports to ensure dependencies are correctly installed
-SHELL ["/bin/bash", "-c"]
 RUN source /opt/conda/bin/activate tts && \
-    echo "Verifying critical imports..." && \
-    python -c "import torch; print(f'PyTorch version: {torch.__version__}'); import torchao; import torchtune; import moshi; import einops; import vector_quantize_pytorch; import triton; import librosa; import silentcipher; print('All critical imports successful')"
-# Reset SHELL to default
-SHELL ["/bin/bash", "-c"]
+    python -c "import torch; print(f'PyTorch version: {torch.__version__}')" && \
+    python -c "import torchvision; print(f'TorchVision version: {torchvision.__version__}')" && \
+    python -c "import torchaudio; print(f'TorchAudio version: {torchaudio.__version__}')" && \
+    python -c "import vector_quantize_pytorch; print('Vector Quantize PyTorch imported successfully')" && \
+    python -c "import torchao; print(f'TorchAO version: {torchao.__version__ if hasattr(torchao, \"__version__\") else \"unknown\"}')" && \
+    python -c "import einops; print(f'Einops version: {einops.__version__}')" && \
+    python -c "import torch; print(f'CUDA available: {torch.cuda.is_available()}')" && \
+    python -c "import nltk; print('NLTK imported successfully')" && \
+    python -c "print('All critical imports verified successfully')"
+
+# Pre-download NLTK data
+RUN source /opt/conda/bin/activate tts && \
+    python -c 'import nltk; nltk.download("punkt", quiet=True)'
 
 # ============================================================================
 # BUILDER STAGE: Set up the environment
@@ -184,16 +164,20 @@ RUN echo "Setting up CSM package..." && \
     cp /tmp/csm/models.py /opt/csm/ && \
     rm -rf /tmp/csm
 
-# Pre-download NLTK data
-SHELL ["/bin/bash", "-c"]
-RUN source /opt/conda/bin/activate tts && \
-    python -c 'import nltk; nltk.download("punkt", quiet=True)'
-
 # Create CSM package __init__.py
 RUN echo '"""Sesame CSM Text-to-Speech package.\n\nThis package provides access to the Sesame CSM text-to-speech model with optimizations for audiobook generation on Jetson devices."""\n\nfrom .generator import load_csm_1b, Segment, Generator\n\n__all__ = ["load_csm_1b", "Segment", "Generator"]' > /opt/csm/__init__.py
 
 # Create directories needed at runtime
 RUN mkdir -p /models /audiobook_data /books /segments
+
+# Create build information file
+RUN echo "Sesame TTS build information" > /opt/build_info.txt && \
+    echo "Build date: $(date)" >> /opt/build_info.txt && \
+    echo "Base image: ${BASE_IMAGE}" >> /opt/build_info.txt && \
+    source /opt/conda/bin/activate tts && \
+    echo "Python version: $(python --version)" >> /opt/build_info.txt && \
+    echo "PyTorch version: $(python -c 'import torch; print(torch.__version__)')" >> /opt/build_info.txt && \
+    echo "CUDA available: $(python -c 'import torch; print(torch.cuda.is_available())')" >> /opt/build_info.txt
 
 # Final cleanup to reduce image size
 RUN find /opt/conda -name "*.a" -delete && \
@@ -216,6 +200,8 @@ LABEL com.nvidia.cuda.version="12.8"
 COPY --from=builder /opt/conda /opt/conda
 COPY --from=builder /opt/csm /opt/csm
 COPY --from=builder /opt/tritonserver /opt/tritonserver
+COPY --from=builder /opt/dependency_docs /opt/dependency_docs
+COPY --from=builder /opt/build_info.txt /opt/build_info.txt
 
 # Create empty directories for volumes
 RUN mkdir -p /models /audiobook_data /books /segments
@@ -237,7 +223,9 @@ ENV PATH="/opt/tritonserver/bin:/opt/conda/bin:${PATH}" \
     TORCH_USE_CUDA_DSA=1
 
 # Make scripts executable
-RUN chmod +x /entrypoint.sh /opt/csm/watermarking.py /opt/utils/* && \
+RUN chmod +x /entrypoint.sh && \
+    if [ -f "/opt/csm/watermarking.py" ]; then chmod +x /opt/csm/watermarking.py; fi && \
+    if [ -d "/opt/utils/" ]; then chmod +x /opt/utils/*; fi && \
     mkdir -p /usr/local/bin && \
     echo 'import sys; sys.path.append("/opt/csm")' > $(python3 -c 'import site; print(site.getsitepackages()[0])')/csm_path.pth
 
