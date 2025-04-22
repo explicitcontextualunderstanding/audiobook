@@ -1,331 +1,637 @@
 # Comprehensive Plan for Generating an Audiobook on Jetson Orin Nano
 
-This document outlines a comprehensive plan for converting a book into an audiobook using two different approaches on the Jetson Orin Nano:
-1. Piper TTS using jetson-containers (faster but lower quality)
-2. Sesame CSM for higher quality voice synthesis (higher quality but slower)
-
-The plan supports both ePub and PDF formats, with ePub being the recommended format due to its better structure for chapter detection and text extraction.
+This document outlines a comprehensive plan for converting a 230-page PDF book into an audiobook using two different approaches on the Jetson Orin Nano:
+1. Piper TTS using jetson-containers (recommended first approach)
+2. Sesame CSM for higher quality voice synthesis (alternative approach)
 
 ## 1. Setup and Environment Preparation
 
 ### 1.1 System Requirements
-- Jetson Orin Nano with **JetPack 6.1 or newer (L4T r36.4.0+)**
+- Jetson Orin Nano with JetPack/L4T
 - At least 5GB of available RAM
 - At least 20GB of free storage space
 - Internet connection for downloading models
-- Docker installed for container-based execution
-- NVIDIA runtime enabled for Docker
 
-### 1.2 Clone the Repository and Install Dependencies
+### 1.2 Clone the jetson-containers Repository
 ```bash
-# Clone this repository
-git clone https://github.com/explicitcontextualunderstanding/audiobook.git
-cd audiobook
-
-# Make scripts executable
-chmod +x *.py *.sh
-
-# Install dependencies using the centralized script
-./scripts/install_dependencies.sh
+# Clone the repository
+git clone https://github.com/dusty-nv/jetson-containers
+cd jetson-containers
 ```
 
 ### 1.3 Prepare Data Directory
 ```bash
-# Create directories for your data and book files
+# Create a directory for your PDF and output files
 mkdir -p ~/audiobook_data
-mkdir -p ~/audiobook
-
-# Copy your book file to the books directory
-cp ~/your_book.epub ~/audiobook/
-# or
-cp ~/your_book.pdf ~/audiobook/
+# Copy your PDF to this directory
+cp ~/learning_with_ai.pdf ~/audiobook_data/
 ```
 
-Note: The repository includes a sample EPUB file (`learning_ai.epub`) that you can use for testing.
+## 2. Approach 1: Generating Audiobook with Piper (via jetson-containers)
 
-### 1.4 Using the Quick Start Script
+### 2.1 Check Available Piper Models
+```bash
+# Show details about the piper container
+./jetson-containers show piper
+```
 
-For convenience, you can use the included `quickstart.sh` script to automatically set up the environment and generate an audiobook:
+### 2.2 Run the Piper Container
+```bash
+# Run the piper container with volume mount for data
+./jetson-containers run --volume ~/audiobook_data:/data --workdir /data piper
+```
+
+### 2.3 Create PDF Processing Script
+
+Inside the container, create a Python script to process the PDF and generate audio:
 
 ```bash
+# Create the script
+cat > generate_audiobook_piper.py << 'EOF'
+#!/usr/bin/env python3
+
+import os
+import sys
+import argparse
+import subprocess
+import re
+from PyPDF2 import PdfReader
+from tqdm import tqdm
+import nltk
+from nltk.tokenize import sent_tokenize
+from pydub import AudioSegment
+
+# Download NLTK data
+nltk.download('punkt', quiet=True)
+
+def extract_text_from_pdf(pdf_path):
+    """Extract text from a PDF file."""
+    print(f"Extracting text from {pdf_path}...")
+    
+    reader = PdfReader(pdf_path)
+    text = ""
+    
+    for i, page in enumerate(tqdm(reader.pages, desc="Processing pages")):
+        page_text = page.extract_text()
+        
+        # Clean up page headers, footers, page numbers, etc.
+        page_text = re.sub(r'Page \d+ of \d+', '', page_text)
+        page_text = re.sub(r'^\s*\d+\s*$', '', page_text, flags=re.MULTILINE)
+        
+        text += page_text + "\n"
+    
+    return text
+
+def split_text_into_chunks(text, max_chars=1000):
+    """Split text into manageable chunks for TTS processing."""
+    print("Splitting text into chunks...")
+    
+    # Split text into sentences
+    sentences = sent_tokenize(text)
+    
+    # Group sentences into chunks
+    chunks = []
+    current_chunk = ""
+    
+    for sentence in sentences:
+        # Clean the sentence
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+            
+        # If adding this sentence doesn't exceed max_chars, add it to the current chunk
+        if len(current_chunk) + len(sentence) + 1 <= max_chars:
+            current_chunk += sentence + " "
+        else:
+            # Save the current chunk if it's not empty
+            if current_chunk:
+                chunks.append(current_chunk.strip())
+            current_chunk = sentence + " "
+    
+    # Add the last chunk if not empty
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+    
+    print(f"Text split into {len(chunks)} chunks")
+    return chunks
+
+def generate_audio_with_piper(text, output_file, model="en_US-lessac-medium"):
+    """Generate audio for a chunk of text using Piper."""
+    # Save text to a temporary file
+    temp_text_file = "/tmp/piper_input.txt"
+    with open(temp_text_file, "w") as f:
+        f.write(text)
+    
+    # Call Piper to generate audio
+    cmd = [
+        "piper",
+        "--model", model,
+        "--output_file", output_file,
+        "--file", temp_text_file
+    ]
+    
+    try:
+        subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        return True
+    except subprocess.CalledProcessError as e:
+        print(f"Error generating audio: {e}")
+        print(f"stderr: {e.stderr.decode()}")
+        return False
+
+def combine_audio_files(audio_files, output_file):
+    """Combine multiple audio files into a single audiobook file."""
+    print(f"Combining {len(audio_files)} audio segments...")
+    
+    combined = AudioSegment.empty()
+    
+    # Add a short pause between segments
+    pause = AudioSegment.silent(duration=500)  # 500ms pause
+    
+    for audio_file in tqdm(audio_files, desc="Combining audio"):
+        segment = AudioSegment.from_file(audio_file)
+        combined += segment + pause
+    
+    # Export the combined audio
+    combined.export(output_file, format="mp3")
+    print(f"Combined audiobook saved to {output_file}")
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate an audiobook from a PDF using Piper TTS")
+    parser.add_argument("--pdf", required=True, help="Path to the PDF file")
+    parser.add_argument("--output", default="audiobook.mp3", help="Output audiobook file path")
+    parser.add_argument("--model", default="en_US-lessac-medium", help="Piper voice model to use")
+    parser.add_argument("--temp_dir", default="temp_audio", help="Directory for temporary audio files")
+    parser.add_argument("--chunk_size", type=int, default=1000, help="Maximum characters per chunk")
+    args = parser.parse_args()
+    
+    # Create temporary directory
+    os.makedirs(args.temp_dir, exist_ok=True)
+    
+    # Extract text from PDF
+    text = extract_text_from_pdf(args.pdf)
+    
+    # Split text into chunks
+    chunks = split_text_into_chunks(text, args.chunk_size)
+    
+    # Generate audio for each chunk
+    audio_files = []
+    
+    for i, chunk in enumerate(tqdm(chunks, desc="Generating audio")):
+        output_file = os.path.join(args.temp_dir, f"chunk_{i:04d}.wav")
+        
+        # Skip if the file already exists (resume capability)
+        if os.path.exists(output_file):
+            print(f"Chunk {i} already processed, skipping...")
+            audio_files.append(output_file)
+            continue
+        
+        # Generate audio for this chunk
+        success = generate_audio_with_piper(chunk, output_file, args.model)
+        
+        if success:
+            audio_files.append(output_file)
+        else:
+            print(f"Failed to generate audio for chunk {i}")
+    
+    # Combine all audio files
+    combine_audio_files(audio_files, args.output)
+    
+    print("Audiobook generation complete!")
+
+if __name__ == "__main__":
+    main()
+EOF
+
 # Make the script executable
-chmod +x quickstart.sh
-
-# Run with an EPUB or PDF file
-./quickstart.sh --input /path/to/your/book.epub --method piper  # For Piper TTS (faster)
-# or
-./quickstart.sh --input /path/to/your/book.epub --method sesame # For Sesame CSM (higher quality)
+chmod +x generate_audiobook_piper.py
 ```
 
-## 2. Docker Container Build Improvements
-
-Based on our recent development history, we've made several key improvements to the Docker build process:
-
-### 2.1 BuildKit Optimization
-Use BuildKit for faster, more efficient builds:
+### 2.4 Install Required Python Packages in the Container
 ```bash
-DOCKER_BUILDKIT=1 docker build -t sesame-tts-jetson -f docker/sesame-tts/Dockerfile .
+# Install required packages
+pip install PyPDF2 nltk tqdm pydub
 ```
 
-### 2.2 Dependency Management Evolution
-Our dependency management strategy has evolved to address several challenges:
+### 2.5 Run the Audiobook Generation Script
+```bash
+# List available Piper voice models
+ls -la /opt/piper/voices
 
-#### 2.2.1 Critical Version Mismatch Issues
-
-We've identified critical version mismatches between our pinned requirements and what's available on the Jetson PyPI index:
-
-| Package | In requirements.txt | Available on Jetson Index |
-|---------|---------------------|---------------------------|
-| torch | 2.2.0 | 2.7.0 |
-| torchvision | 0.17.0 | 0.22.0 |
-| torchaudio | 2.2.0 | 2.7.0 |
-| torchao | 0.1.0 | 0.11.0+ |
-| triton | 2.1.0 | 3.3.0 |
-
-**Important**: Due to these mismatches, pinned packages may be sourced from standard PyPI or NGC repositories instead of the Jetson-optimized index, potentially leading to:
-- Installation failures for ARM64 architecture
-- Sub-optimal performance
-- Missing hardware acceleration
-
-#### 2.2.2 Recommended Approach for requirements.txt
-
-**Option 1**: Use the Jetson-optimized versions (higher performance but less tested):
-```
-# Core PyTorch - use Jetson-optimized versions
-torch==2.7.0
-torchvision==0.22.0
-torchaudio==2.7.0
-torchao==0.11.0
-triton==3.3.0
-
-# Keep other critical dependencies at tested versions
-vector_quantize_pytorch==1.22.15
-torchtune==0.3.0
-moshi==0.2.2
+# Run the script with a specific voice model
+python generate_audiobook_piper.py --pdf /data/learning_with_ai.pdf --output /data/audiobook_piper.mp3 --model en_US-lessac-medium
 ```
 
-**Option 2**: Create a requirements.lock.txt file to ensure reproducible builds:
-```
-# Core dependencies pinned to tested versions
-torch==2.2.0
-torchvision==0.17.0
-torchaudio==2.2.0
-vector_quantize_pytorch==1.22.15
-tokenizers==0.13.3
-transformers==4.31.0
-huggingface_hub==0.16.4
-accelerate==0.25.0
-soundfile==0.12.1
-pydub==0.25.1
-sounddevice==0.5.0
-ebooklib==0.18.0
-beautifulsoup4==4.12.2
-PyPDF2==3.0.1
-pdfminer.six==20221105
-nltk==3.8.1
-librosa==0.10.1
-einops==0.8.0
-torchao==0.1.0
-torchtune==0.3.0
-moshi==0.2.2
-silentcipher==1.0.1
-triton==2.1.0
+### 2.6 Monitor and Manage the Process
+```bash
+# To check progress
+ls -la /data/temp_audio | wc -l
 
-# Common transitive dependencies (not exhaustive)
-numpy==1.26.0
-packaging==23.2
-pillow==10.1.0
-tqdm==4.66.1
-psutil==5.9.6
+# To resume if interrupted
+python generate_audiobook_piper.py --pdf /data/learning_with_ai.pdf --output /data/audiobook_piper.mp3
 ```
 
-#### 2.2.3 Custom PyPI Index Configuration
+## 3. Approach 2: Generating Audiobook with Sesame CSM
 
-For better control over package sources, modify the Dockerfile to explicitly specify indices:
+### 3.1 Set Up Environment for Sesame CSM
+```bash
+# Install system dependencies
+sudo apt update
+sudo apt install -y python3-venv python3-pip ffmpeg libsndfile1
+
+# Create project directory
+mkdir -p ~/sesame_project
+cd ~/sesame_project
+
+# Create and activate virtual environment
+python3 -m venv venv
+source venv/bin/activate
+
+# Install Python dependencies
+pip install --upgrade pip
+pip install PyPDF2 pdfminer.six nltk tqdm pydub transformers huggingface_hub numpy scipy librosa soundfile psutil torch
+```
+
+### 3.2 Install Sesame CSM
+```bash
+# Clone the repository
+git clone https://github.com/SesameAILabs/csm.git
+cd csm
+
+# Install in development mode
+pip install -e .
+
+# Download the model
+python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='sesame/csm-1b')"
+
+# Go back to project directory
+cd ..
+```
+
+### 3.3 Create Audiobook Generation Script
+```bash
+# Create the script
+cat > generate_audiobook_sesame.py << 'EOF'
+#!/usr/bin/env python3
+
+import os
+import torch
+import argparse
+from tqdm import tqdm
+from pathlib import Path
+from PyPDF2 import PdfReader
+from pydub import AudioSegment
+from nltk.tokenize import sent_tokenize
+import nltk
+import re
+import time
+
+# Download NLTK resources if not already downloaded
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+
+def extract_text_from_pdf(pdf_path):
+    """Extract text from a PDF file."""
+    print(f"Extracting text from {pdf_path}...")
+    
+    reader = PdfReader(pdf_path)
+    text = ""
+    
+    for i, page in enumerate(tqdm(reader.pages, desc="Processing pages")):
+        page_text = page.extract_text()
+        
+        # Clean page headers/footers
+        page_text = re.sub(r'Page \d+ of \d+', '', page_text)
+        page_text = re.sub(r'^\s*\d+\s*$', '', page_text, flags=re.MULTILINE)
+        
+        text += page_text + "\n"
+    
+    return text
+
+def preprocess_text(text, max_chunk_size=1000):
+    """Clean and split text into manageable chunks."""
+    print("Preprocessing text...")
+    
+    # Remove extra whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
+    
+    # Split into sentences
+    sentences = sent_tokenize(text)
+    
+    # Group sentences into chunks
+    chunks = []
+    current_chunk = ""
+    
+    for sentence in sentences:
+        if len(current_chunk) + len(sentence) < max_chunk_size:
+            current_chunk += sentence + " "
+        else:
+            chunks.append(current_chunk.strip())
+            current_chunk = sentence + " "
+            
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+        
+    print(f"Split text into {len(chunks)} chunks")
+    return chunks
+
+def generate_audio(model, text, output_path):
+    """Generate audio for a text segment."""
+    try:
+        # Clear CUDA cache
+        torch.cuda.empty_cache()
+        
+        # Generate audio
+        audio = model.generate(text=text)
+        audio.export(output_path, format="mp3")
+        return True
+    except Exception as e:
+        print(f"Error generating audio: {e}")
+        return False
+
+def combine_audio_files(audio_files, output_path):
+    """Combine multiple audio files into a single audiobook."""
+    print(f"Combining {len(audio_files)} audio segments...")
+    
+    # Start with an empty audio segment
+    combined = AudioSegment.empty()
+    
+    # Add a pause between segments (500ms)
+    pause = AudioSegment.silent(duration=500)
+    
+    # Combine all files
+    for file_path in tqdm(audio_files, desc="Combining audio"):
+        segment = AudioSegment.from_mp3(file_path)
+        combined += segment + pause
+        
+    # Export the final audiobook
+    combined.export(output_path, format="mp3")
+    print(f"Audiobook saved to {output_path}")
+
+def main():
+    parser = argparse.ArgumentParser(description="Generate an audiobook from a PDF using Sesame CSM")
+    parser.add_argument("--pdf", required=True, help="Path to the PDF file")
+    parser.add_argument("--output", default="audiobook_sesame.mp3", help="Output audiobook file path")
+    parser.add_argument("--temp_dir", default="temp_audio_sesame", help="Directory for temporary audio files")
+    parser.add_argument("--chunk_size", type=int, default=1000, help="Maximum characters per chunk")
+    args = parser.parse_args()
+    
+    # Create temporary directory
+    os.makedirs(args.temp_dir, exist_ok=True)
+    
+    # Extract and preprocess text
+    text = extract_text_from_pdf(args.pdf)
+    chunks = preprocess_text(text, args.chunk_size)
+    
+    # Load CSM model
+    print("Loading Sesame CSM model...")
+    from csm import CSMModel
+    model = CSMModel.from_pretrained("sesame/csm-1b")
+    model = model.half().to("cuda")  # Use half precision to save memory
+    
+    # Process each chunk
+    print(f"Processing {len(chunks)} text segments...")
+    audio_files = []
+    
+    for i, chunk in enumerate(tqdm(chunks, desc="Generating audio")):
+        output_path = os.path.join(args.temp_dir, f"chunk_{i:04d}.mp3")
+        
+        # Skip if already processed
+        if os.path.exists(output_path):
+            print(f"Skipping chunk {i} - already processed")
+            audio_files.append(output_path)
+            continue
+        
+        # Generate audio
+        success = generate_audio(model, chunk, output_path)
+        if success:
+            audio_files.append(output_path)
+            
+        # Take a short break every 5 chunks to prevent overheating
+        if i % 5 == 0 and i > 0:
+            print("Taking a short break to prevent overheating...")
+            time.sleep(10)
+            torch.cuda.empty_cache()
+    
+    # Combine audio files
+    combine_audio_files(audio_files, args.output)
+    
+    print("Audiobook generation complete!")
+
+if __name__ == "__main__":
+    main()
+EOF
+
+# Make the script executable
+chmod +x generate_audiobook_sesame.py
+```
+
+### 3.4 Run the Sesame CSM Audiobook Generation Script
+```bash
+# Make sure virtual environment is activated
+source ~/sesame_project/venv/bin/activate
+
+# Run the script
+cd ~/sesame_project
+python generate_audiobook_sesame.py --pdf ~/audiobook_data/learning_with_ai.pdf --output ~/audiobook_data/audiobook_sesame.mp3
+```
+
+## 3.5 (Optional) Running Automated Dependency Analysis
+
+If you encounter build issues related to dependencies, especially `ResolutionImpossible` errors during the `pip-compile` stage, an automated analysis script can help diagnose and potentially fix the `requirements.in` file.
 
 ```bash
-# Configure pip for faster installations
-RUN mkdir -p ~/.config/pip && \
-    echo "[global]" > ~/.config/pip/pip.conf && \
-    echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
-    echo "extra-index-url = https://pypi.ngc.nvidia.com https://pypi.org/simple" >> ~/.config/pip/pip.conf && \
-    echo "timeout = 60" >> ~/.config/pip/pip.conf && \
-    echo "retries = 3" >> ~/.config/pip/pip.conf
+# Navigate to your project root directory
+cd ~/audiobook
+
+# Run the dependency extraction script
+# This script builds a temporary analysis container, runs checks, and extracts results.
+./scripts/dependency/extract_during_build.sh
 ```
 
-Or use the `--index-url` flags directly with pip in the Dockerfile:
+This script will output results to a timestamped directory, typically within `~/audiobook/dependency_artifacts/`. The script's final output will indicate the exact location (e.g., `~/audiobook/dependency_artifacts/build_analysis`).
+
+Key files generated in the output directory:
+*   `analysis_report.md`
+*   `package_install_results.csv`
+*   `wheel_availability.txt`
+*   `pip_compile_error.txt`
+*   **`requirements.in`**: a copy of your original requirements.in used for analysis  
+  → You can use this file as a starting point, or copy it back into your build directory:
+    ```bash
+    cp ~/audiobook/dependency_artifacts/build_analysis/requirements.in \
+       ~/audiobook/docker/sesame-tts/requirements.in
+    ```
+*   `test_packages.sh`
+*   (no `recommended_requirements.in` if resolution failed)
+
+**Applying the Recommendations:**
+
+1.  **Check Logs & Report:** Examine the `analysis_report.md` and, crucially, the `pip_compile_error.txt` (or similar log file) in the output directory to understand why resolution might have failed.
+    ```bash
+    cat ~/audiobook/dependency_artifacts/build_analysis/analysis_report.md
+    cat ~/audiobook/dependency_artifacts/build_analysis/pip_compile_error.txt # Or pip_compile_log.txt
+    # (Replace 'build_analysis' with the actual output directory name if different)
+    ```
+
+2.  **Apply Changes:**
+    *   **If `recommended_requirements.in` exists:** Review it and copy it over the one used by your main build.
+        ```bash
+        # Adjust path if your output directory is different
+        cp ~/audiobook/dependency_artifacts/build_analysis/recommended_requirements.in ~/audiobook/docker/sesame-tts/requirements.in
+        ```
+    *   **If `recommended_requirements.in` does NOT exist:** Manually edit `~/audiobook/docker/sesame-tts/requirements.in` based on the analysis report's text recommendations and the errors found in the compile logs (e.g., adjust versions, remove conflicting packages like `moshi`).
+
+3.  **Rebuild the Docker image with no cache** (ensures the resolver stage re‑runs and picks up Rust installation):
 
 ```bash
-pip install --no-cache-dir --prefer-binary \
-    --index-url https://pypi.jetson-ai-lab.dev/simple \
-    --extra-index-url https://pypi.ngc.nvidia.com \
-    --extra-index-url https://pypi.org/simple \
-    -r requirements.txt
+cd ~/audiobook
+./scripts/dependency/setup_multistage.sh
+./scripts/dependency/build.sh --no-cache
 ```
 
-### 2.3 Multi-Stage Docker Build
+## 4. Performance Optimization and Monitoring
 
-We've optimized the Dockerfile with a multi-stage approach:
-1. **Dependencies Stage**: Installs all dependencies and caches them
-2. **Builder Stage**: Sets up models, utilities, and configuration
-3. **Runtime Stage**: Creates the minimal runtime image
-
-This approach significantly reduces the final image size and improves build times through better caching.
-
-### 2.4 Testing the Build
-
-Use our provided scripts to build and test the container:
+### 4.1 Monitoring Tools
 ```bash
-# Build the container with BuildKit enabled
-./scripts/build.sh --use-buildkit --cache
+# Monitor GPU usage and temperature
+sudo tegrastats
 
-# Test the container
-./scripts/test_container.sh
+# Monitor CPU and memory usage
+htop
+
+# Monitor disk usage
+df -h
 ```
 
-## 3. Approach 1: Generating Audiobook with Piper (via jetson-containers)
+### 4.2 Optimization Tips for Jetson Orin Nano
 
-### 3.1 Overview of Piper TTS
-Piper TTS is a fast, local text-to-speech system that runs efficiently on the Jetson Nano. It uses a neural vocoder model to generate speech from text and provides several different voice models to choose from.
+#### Memory Management
+- Use half-precision (FP16) for model inference
+- Clear CUDA cache between batches with `torch.cuda.empty_cache()`
+- Process smaller text chunks
+- Close unnecessary applications while processing
 
-### 3.2 Available Voice Models
+#### Thermal Management
+- Add periodic cooling breaks (implemented in both scripts)
+- Monitor temperature with `tegrastats`
+- Consider additional cooling if temperatures exceed 80°C
+- Run the process overnight for cooler ambient temperatures
 
-| Voice | Language | Gender | Style | Good For |
-|-------|----------|--------|-------|----------|
-| Lessac | English (US) | Female | Professional | Audiobooks, narration |
-| Ryan | English (US) | Male | Clear | Technical content |
-| Jenny | English (GB) | Female | Warm | Storytelling |
-| Kathleen | English (US) | Female | Warm | Children's books |
-| Alan | English (GB) | Male | Formal | Academic content |
+#### Storage Management
+- Pre-clear space before starting
+- Use compressed audio formats (MP3)
+- Clean up temporary files after completion
 
-### 3.3 Using Piper Directly
+## 5. Comparing the Two Approaches
 
-If you prefer to run Piper TTS container manually instead of using the quickstart script:
+### 5.1 Piper Advantages
+- Directly integrated with jetson-containers ecosystem
+- Lower memory footprint
+- Faster processing
+- Multiple voices available
+- Easier setup
 
-```bash
-# Run the piper-tts container with correct volume mounts
-./jetson-containers run --volume ~/audiobook_data:/audiobook_data \
-  --volume ~/audiobook:/books \
-  --workdir /audiobook_data $(./autotag piper-tts)
+### 5.2 Sesame CSM Advantages
+- Higher quality, more natural voices
+- Better prosody and emotional range
+- More humanlike intonation
+- State-of-the-art voice quality
+- Better for long-form content like audiobooks
 
-# Inside the container, install required packages
-pip install PyPDF2 nltk tqdm pydub ebooklib beautifulsoup4 psutil
+### 5.3 Deciding Which to Use
+- **For quick results or limited hardware**: Use Piper
+- **For highest quality**: Use Sesame CSM
+- **Consider testing both**: Generate a small sample with each to compare quality
 
-# Run the generator script
-python /books/generate_audiobook_piper.py \
-  --input /books/your_book.epub \
-  --output /audiobook_data/audiobook_piper.mp3 \
-  --model /opt/piper/voices/en/en_US-lessac-medium.onnx \
-  --temp_dir /audiobook_data/temp_audio_piper \
-  --max_batch_size 15 \
-  --memory_per_chunk 50
-```
+## 6. Additional Enhancements
 
-## 4. Approach 2: Using Sesame CSM for Higher Quality Voice
-
-### 4.1 Overview of Sesame CSM
-Sesame CSM (Compact Speech Model) is a high-quality text-to-speech system that produces more natural sounding voices. It is larger and slower than Piper but produces better quality speech output.
-
-### 4.2 Available Voice Presets
-
-| Voice Preset | Style | Good For |
-|--------------|-------|----------|
-| calm | Gentle, measured pace | Audiobooks, meditation |
-| excited | Energetic, engaging | Educational content, entertainment |
-| authoritative | Formal, clear | Technical documentation, academic content |
-| gentle | Soft, soothing | Children's books, bedtime stories |
-| narrative | Storytelling flow | Fiction books, narratives |
-
-### 4.3 Using Sesame CSM Directly
-
-If you prefer to run the Sesame CSM container manually instead of using the quickstart script:
+### 6.1 Adding Chapter Markers
+To add chapter markers to the final audiobook (requires ffmpeg):
 
 ```bash
-# Run the container with needed volume mounts
-docker run --runtime nvidia -it --rm \
-  --name sesame-tts \
-  --volume ~/audiobook_data:/audiobook_data \
-  --volume ~/audiobook:/books \
-  --volume ~/huggingface_models/sesame-csm-1b:/models/sesame-csm-1b \
-  --volume ${HOME}/.cache/huggingface:/root/.cache/huggingface \
-  --workdir /audiobook_data \
-  sesame-tts-jetson /opt/conda/bin/conda run -n tts --no-capture-output \
-  python3 /books/generate_audiobook_sesame.py \
-  --input /books/your_book.epub \
-  --output /audiobook_data/audiobook_sesame.mp3 \
-  --model_path /models/sesame-csm-1b \
-  --voice_preset calm \
-  --max_batch_size 8 \
-  --memory_per_chunk 150
+# Extract chapter titles and timestamps
+python extract_chapters.py --pdf learning_with_ai.pdf --output chapters.txt
+
+# Add chapter markers to the audiobook
+ffmpeg -i audiobook.mp3 -i chapters.txt -map_metadata 1 -codec copy audiobook_chaptered.mp3
 ```
 
-## 5. Troubleshooting Docker Build Issues
+### 6.2 Parallel Processing with Multiple Jetson Devices
+If you have two Jetson Orin Nano devices, you can divide the workload:
 
-Based on our development history, here are common issues and solutions:
-
-### 5.1 Package Installation Failures
-
-If you encounter package installation failures:
-
-1. **Version Mismatch Issues**:
-   The most likely cause of build failures is the version mismatch between your requirements.txt and the Jetson-optimized index. Consider:
-   - Using the latest Jetson-optimized versions instead of pinned versions
-   - Using a base image with pre-installed PyTorch compatible with your requirements
-   - Checking for ARM64-compatible wheels for your pinned versions
-
-2. **Check Base Image Availability**:
-   ```bash
-   docker pull dustynv/pytorch:2.6-r36.4.0-cu128-24.04
-   ```
-
-3. **Network/PyPI Mirror Issues**:
-   If the Jetson-specific PyPI mirrors are inaccessible, modify the Dockerfile to use standard PyPI:
-   ```bash
-   # Comment out this line:
-   # echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf
-   ```
-
-4. **Architecture Issues**:
-   If building on an x86 machine for Jetson (ARM64), use cross-platform building:
-   ```bash
-   docker buildx create --use
-   docker buildx build --platform linux/arm64 -t sesame-tts-jetson .
-   ```
-
-5. **Debug Specific Stage**:
-   Target a specific build stage to identify where the failure occurs:
-   ```bash
-   docker build --target dependencies -t sesame-tts-deps .
-   ```
-
-6. **Verbose Output**:
-   Use verbose output to see detailed error messages:
-   ```bash
-   DOCKER_BUILDKIT=1 docker build --progress=plain -t sesame-tts-jetson .
-   ```
-
-### 5.2 Recommended Environment Variables
-
-Set these environment variables for optimal builds:
 ```bash
-export DOCKER_BUILDKIT=1
-export BUILDKIT_PROGRESS=plain
-export PYTHONHASHSEED=0
-export PIP_DEFAULT_TIMEOUT=100
+# On device 1:
+python generate_audiobook.py --pdf learning_with_ai.pdf --chunk_range 0-500
+
+# On device 2:
+python generate_audiobook.py --pdf learning_with_ai.pdf --chunk_range 501-1000
 ```
 
-## 6. Future Improvements
+### 6.3 Improving Voice Quality
+For Piper, you can adjust parameters:
 
-Planned improvements for the project include:
-1. **Multi-voice Audiobooks**: Support for using different voices for dialogue vs. narration.
-2. **Improved EPUB Navigation**: Better chapter detection for complex EPUB structures.
-3. **Custom Voice Training**: Support for training your own voice models.
-4. **Web Interface**: A simple web UI for generating audiobooks without the command line.
-5. **Chapter Metadata**: Adding chapter metadata to the generated MP3 files for better navigation.
-6. **Further Build Optimization**: Continue refining dependency management and build process based on our learnings.
-7. **Cross-Platform Support**: Improve compatibility across different host architectures.
-8. **Dependency Harmonization**: Better align our package version requirements with the Jetson-optimized PyPI index.
+```bash
+# Use higher quality settings
+piper --model en_US-lessac-medium --output_file output.wav --file input.txt --speaker-id 0 --quality 100
+```
 
-## 7. License
+For Sesame CSM, you can modify voice parameters:
 
-This project is open source and available under the MIT License.
+```python
+# Adjust voice parameters (example)
+audio = model.generate(
+    text=text,
+    voice_preset="calm", 
+    speaking_rate=0.95
+)
+```
+
+## 7. Troubleshooting Common Issues
+
+### 7.1 Memory Errors
+```
+# If you encounter CUDA out of memory errors
+1. Reduce chunk size in the script
+2. Try restarting the Jetson to clear memory
+3. Use half precision (already implemented)
+4. Process fewer chunks at a time
+```
+
+### 7.2 Installation Issues
+```
+# If pip fails to install packages
+sudo apt update
+sudo apt install -y build-essential python3-dev
+
+# Check if Rust/Cargo is needed (error messages mentioning "cargo" or "rust")
+# If so, install it:
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+# Then retry pip install
+
+# If PyTorch fails to install
+# Ensure you are using the correct index URLs for Jetson wheels
+# Example for manual install:
+# pip install --extra-index-url https://pypi.ngc.nvidia.com --extra-index-url https://pypi.jetson-ai-lab.dev/simple torch torchvision torchaudio
+
+# For audio library issues
+sudo apt install -y libasound2-dev portaudio19-dev libportaudio2 libportaudiocpp0 ffmpeg libav-tools libsndfile1
+```
+
+### 7.3 Docker or Container Issues
+```
+# If container fails to start
+sudo systemctl restart docker
+sudo systemctl restart nvidia-container-runtime
+
+# If GPU is not available in container
+./jetson-containers run --runtime nvidia --gpus all piper
+```
+
+## Conclusion
+
+This comprehensive plan provides two complete approaches for generating an audiobook from a PDF on Jetson Orin Nano devices. The Piper approach using jetson-containers offers simplicity and efficiency, while the Sesame CSM approach provides higher quality voice synthesis. 
+
+Both methods include optimizations for the limited resources of the Jetson platform, robust error handling, and the ability to resume processing if interrupted. By following this guide, you can convert your 230-page "Learning with AI" book into a high-quality audiobook using local processing on your Jetson Orin Nano.

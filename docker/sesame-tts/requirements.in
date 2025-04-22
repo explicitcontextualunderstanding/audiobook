@@ -7,7 +7,7 @@ torchaudio>=2.7.0
 vector_quantize_pytorch>=1.22.15
 torchao>=0.11.0
 moshi>=0.2.2
-triton>=3.3.0
+tritonclient[all]==2.55.0  # Align with Triton Server v2.55.0 in CI config
 
 # Updated other critical dependencies for better compatibility
 einops>=0.8.0

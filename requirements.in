@@ -60,4 +60,4 @@ torchtune==0.3.0
 # silentcipher>=1.0.1 # May require additional testing
 
 # Triton support - Check compatibility with torch 2.7
-triton==2.1.0
+tritonclient[all]==2.55.0  # Aligns with Triton Server v2.55.0
