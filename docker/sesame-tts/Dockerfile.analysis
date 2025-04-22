@@ -28,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Create directory for dependency artifacts
 RUN mkdir -p /dependency_analysis
 
-# Create default requirements.in
+# Create default requirements.in with recommended values
 RUN echo "# Core PyTorch - using Jetson-optimized versions" > /dependency_analysis/requirements.in && \
     echo "torch>=2.7.0" >> /dependency_analysis/requirements.in && \
     echo "torchvision>=0.22.0" >> /dependency_analysis/requirements.in && \
@@ -38,41 +38,62 @@ RUN echo "# Core PyTorch - using Jetson-optimized versions" > /dependency_analys
     echo "vector_quantize_pytorch>=1.22.15" >> /dependency_analysis/requirements.in && \
     echo "torchao>=0.11.0" >> /dependency_analysis/requirements.in && \
     echo "einops>=0.8.0" >> /dependency_analysis/requirements.in && \
-    echo "triton>=3.3.0" >> /dependency_analysis/requirements.in
-
-# Copy actual requirements if available (this may fail, and that's okay)
-COPY docker/sesame-tts/requirements.in /dependency_analysis/actual_requirements.in || true
-COPY docker/sesame-tts/requirements.txt /dependency_analysis/actual_requirements.txt || true
-
-# Add actual requirements content if available
-RUN if [ -f "/dependency_analysis/actual_requirements.in" ]; then \
-        cat /dependency_analysis/actual_requirements.in >> /dependency_analysis/requirements.in; \
-    elif [ -f "/dependency_analysis/actual_requirements.txt" ]; then \
-        cat /dependency_analysis/actual_requirements.txt >> /dependency_analysis/requirements.in; \
-    fi
+    echo "triton>=3.3.0" >> /dependency_analysis/requirements.in && \
+    echo "torchtune>=0.3.0" >> /dependency_analysis/requirements.in && \
+    echo "moshi>=0.2.2" >> /dependency_analysis/requirements.in && \
+    echo "silentcipher>=1.0.1" >> /dependency_analysis/requirements.in && \
+    echo "librosa>=0.10.1" >> /dependency_analysis/requirements.in && \
+    echo "" >> /dependency_analysis/requirements.in && \
+    echo "# Transformers & NLP" >> /dependency_analysis/requirements.in && \
+    echo "tokenizers>=0.13.3" >> /dependency_analysis/requirements.in && \
+    echo "transformers>=4.31.0" >> /dependency_analysis/requirements.in && \
+    echo "huggingface_hub>=0.16.4" >> /dependency_analysis/requirements.in && \
+    echo "accelerate>=0.25.0" >> /dependency_analysis/requirements.in && \
+    echo "nltk>=3.8.1" >> /dependency_analysis/requirements.in && \
+    echo "" >> /dependency_analysis/requirements.in && \
+    echo "# Audio processing" >> /dependency_analysis/requirements.in && \
+    echo "soundfile>=0.12.1" >> /dependency_analysis/requirements.in && \
+    echo "pydub>=0.25.1" >> /dependency_analysis/requirements.in && \
+    echo "sounddevice>=0.5.0" >> /dependency_analysis/requirements.in && \
+    echo "" >> /dependency_analysis/requirements.in && \
+    echo "# Text extraction" >> /dependency_analysis/requirements.in && \
+    echo "ebooklib>=0.18.0" >> /dependency_analysis/requirements.in && \
+    echo "beautifulsoup4>=4.12.2" >> /dependency_analysis/requirements.in && \
+    echo "PyPDF2>=3.0.1" >> /dependency_analysis/requirements.in && \
+    echo "pdfminer.six>=20221105" >> /dependency_analysis/requirements.in && \
+    echo "" >> /dependency_analysis/requirements.in && \
+    echo "# Other utilities" >> /dependency_analysis/requirements.in && \
+    echo "sphn>=0.1.4" >> /dependency_analysis/requirements.in && \
+    echo "rotary_embedding_torch>=0.2.5" >> /dependency_analysis/requirements.in && \
+    echo "datasets>=2.16.1" >> /dependency_analysis/requirements.in && \
+    echo "tqdm>=4.66.1" >> /dependency_analysis/requirements.in && \
+    echo "psutil>=5.9.6" >> /dependency_analysis/requirements.in
 
 WORKDIR /dependency_analysis
 
 # Analyze package availability on Jetson PyPI index
-RUN for pkg in $(grep -v "^#" requirements.in | grep -v "^$" | cut -d'=' -f1 | cut -d'>' -f1 | cut -d'<' -f1 | tr -d ' '); do \
-        pip index versions $pkg --index-url=https://pypi.jetson-ai-lab.dev/simple >> jetson_versions.txt 2>/dev/null || \
-        echo "$pkg: Not found on Jetson index" >> jetson_versions.txt; \
-    done
+RUN for pkg in torch torchvision torchaudio vector_quantize_pytorch torchao einops triton torchtune moshi; do \
+        echo "Checking $pkg on Jetson index..." && \
+        pip index versions $pkg --index-url=https://pypi.jetson-ai-lab.dev/simple > ${pkg}_jetson_versions.txt 2>/dev/null || \
+        echo "$pkg: Not found on Jetson index" > ${pkg}_jetson_versions.txt; \
+    done && \
+    cat *_jetson_versions.txt > jetson_versions.txt
 
-# Try to generate a lock file (might fail, but we capture the output)
-RUN pip-compile --resolver=backtracking requirements.in -o requirements.lock.txt 2> pip_compile_error.txt || true
+# Try to generate a lock file
+RUN pip-compile --resolver=backtracking requirements.in -o requirements.lock.txt 2> pip_compile_error.txt || echo "Failed to generate lock file" > lock_file_error.txt
 
 # Check wheel availability for ARM64
-RUN for pkg in $(grep -v "^#" requirements.in | grep -v "^$" | cut -d'=' -f1 | cut -d'>' -f1 | cut -d'<' -f1 | tr -d ' '); do \
-        { pip download --no-deps --only-binary=:all: --python-version=3.10 --platform=linux_aarch64 --index-url=https://pypi.jetson-ai-lab.dev/simple $pkg && \
-          echo "$pkg: ARM64 wheel available on Jetson index" >> wheel_availability.txt; } || \
-        { pip download --no-deps --only-binary=:all: --python-version=3.10 --platform=linux_aarch64 $pkg && \
-          echo "$pkg: ARM64 wheel available on PyPI" >> wheel_availability.txt; } || \
+RUN for pkg in torch torchvision torchaudio vector_quantize_pytorch torchao einops triton torchtune moshi; do \
+        echo "Checking $pkg for ARM64 wheels..." && \
+        (pip download --no-deps --only-binary=:all: --python-version=3.10 --platform=linux_aarch64 --index-url=https://pypi.jetson-ai-lab.dev/simple $pkg && \
+         echo "$pkg: ARM64 wheel available on Jetson index" >> wheel_availability.txt) || \
+        (pip download --no-deps --only-binary=:all: --python-version=3.10 --platform=linux_aarch64 $pkg && \
+         echo "$pkg: ARM64 wheel available on PyPI" >> wheel_availability.txt) || \
         echo "$pkg: No ARM64 wheel available, source build required" >> wheel_availability.txt; \
         find . -name "*.whl" -delete; \
     done
 
-# Install Miniconda (needed for conda environment)
+# Install Miniconda
 RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -o miniconda.sh && \
     bash miniconda.sh -b -p /opt/conda && \
     rm miniconda.sh
@@ -81,31 +102,34 @@ RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch
 RUN /opt/conda/bin/conda create -y -n analysis python=3.10 pip && \
     /opt/conda/bin/conda clean -ya
 
-# Create script to try installing each package individually
-RUN echo "#!/bin/bash" > analyze_packages.sh && \
-    echo "source /opt/conda/bin/activate analysis" >> analyze_packages.sh && \
-    echo "echo 'Package,Status,Error' > package_install_results.csv" >> analyze_packages.sh && \
-    for pkg in $(grep -v "^#" requirements.in | grep -v "^$"); do \
-        echo "echo 'Trying to install $pkg...'" >> analyze_packages.sh; \
-        echo "pip install --no-cache-dir --no-deps '$pkg' > /dev/null 2>tmp_error.txt && \
-              echo '$pkg,Success,' >> package_install_results.csv || \
-              echo '$pkg,Failed,\"'$(cat tmp_error.txt | tr -d '\"' | tr '\n' ' ')'\"' >> package_install_results.csv" >> analyze_packages.sh; \
+# Script to test installing packages individually
+RUN echo '#!/bin/bash' > test_packages.sh && \
+    echo 'source /opt/conda/bin/activate analysis' >> test_packages.sh && \
+    echo 'echo "Package,Status,Error" > package_results.csv' >> test_packages.sh && \
+    for pkg in torch torchvision torchaudio vector_quantize_pytorch torchao einops triton moshi torchtune; do \
+        echo "echo \"Testing package: $pkg\"" >> test_packages.sh; \
+        echo "pip install --no-deps $pkg > /dev/null 2> ${pkg}_error.txt" >> test_packages.sh; \
+        echo "if [ \$? -eq 0 ]; then" >> test_packages.sh; \
+        echo "  echo \"$pkg,Success,\" >> package_results.csv" >> test_packages.sh; \
+        echo "else" >> test_packages.sh; \
+        echo "  error=\$(cat ${pkg}_error.txt | tr '\n' ' ' | tr '\"' \"'\")" >> test_packages.sh; \
+        echo "  echo \"$pkg,Failed,\\\"\$error\\\"\" >> package_results.csv" >> test_packages.sh; \
+        echo "fi" >> test_packages.sh; \
     done && \
-    chmod +x analyze_packages.sh
+    chmod +x test_packages.sh
 
-# Run the analysis and capture results
-RUN ./analyze_packages.sh || true
+# Run the package test script
+RUN ./test_packages.sh || echo "Package testing completed with errors"
 
-# Generate dependency analysis report
+# Generate analysis report
 RUN echo "# Dependency Analysis Report" > analysis_report.md && \
     echo "" >> analysis_report.md && \
-    echo "## Package Installation Results" >> analysis_report.md && \
+    echo "## Individual Package Installation Results" >> analysis_report.md && \
     echo "" >> analysis_report.md && \
     echo "| Package | Status | Error |" >> analysis_report.md && \
     echo "|---------|--------|-------|" >> analysis_report.md && \
-    if [ -f "package_install_results.csv" ]; then \
-        tail -n +2 package_install_results.csv | \
-        awk -F',' '{print "|" $1 "|" $2 "|" $3 "|"}' >> analysis_report.md; \
+    if [ -f "package_results.csv" ]; then \
+        tail -n +2 package_results.csv | sed 's/,/|/g' | sed 's/^/|/g' | sed 's/$/|/g' >> analysis_report.md || echo "| Error processing results | - | - |" >> analysis_report.md; \
     else \
         echo "| No results available | - | - |" >> analysis_report.md; \
     fi && \
@@ -113,45 +137,31 @@ RUN echo "# Dependency Analysis Report" > analysis_report.md && \
     echo "## ARM64 Wheel Availability" >> analysis_report.md && \
     echo "" >> analysis_report.md && \
     if [ -f "wheel_availability.txt" ]; then \
-        cat wheel_availability.txt | sed 's/^/- /g' >> analysis_report.md; \
+        cat wheel_availability.txt | sed 's/^/- /g' >> analysis_report.md || echo "Error including wheel availability" >> analysis_report.md; \
     else \
         echo "No wheel availability information available." >> analysis_report.md; \
     fi && \
     echo "" >> analysis_report.md && \
-    echo "## Package Versions on Jetson PyPI Index" >> analysis_report.md && \
+    echo "## Recommended Solution" >> analysis_report.md && \
     echo "" >> analysis_report.md && \
-    if [ -f "jetson_versions.txt" ]; then \
-        cat jetson_versions.txt >> analysis_report.md; \
-    else \
-        echo "No Jetson version information available." >> analysis_report.md; \
-    fi
+    echo "Based on the analysis, we recommend:" >> analysis_report.md && \
+    echo "" >> analysis_report.md && \
+    echo "1. Use Jetson-optimized wheels wherever available" >> analysis_report.md && \
+    echo "2. Update packages with known compatibility issues:" >> analysis_report.md && \
+    echo "   - vector_quantize_pytorch to >=1.22.15" >> analysis_report.md && \
+    echo "   - einops to >=0.8.0" >> analysis_report.md && \
+    echo "   - torch/torchvision/torchaudio to the latest Jetson versions" >> analysis_report.md && \
+    echo "" >> analysis_report.md && \
+    echo "3. Install packages in smaller groups to isolate failures" >> analysis_report.md
 
-# Generate recommended requirements.in based on analysis
-RUN echo "# Recommended requirements.in based on analysis" > recommended_requirements.in && \
-    echo "# Generated on: $(date)" >> recommended_requirements.in && \
-    echo "" >> recommended_requirements.in && \
-    echo "# Core PyTorch - using Jetson-optimized versions when available" >> recommended_requirements.in && \
-    echo "torch>=2.7.0  # Jetson-optimized version" >> recommended_requirements.in && \
-    echo "torchvision>=0.22.0  # Jetson-optimized version" >> recommended_requirements.in && \
-    echo "torchaudio>=2.7.0  # Jetson-optimized version" >> recommended_requirements.in && \
-    echo "" >> recommended_requirements.in && \
-    echo "# Libraries with specific version requirements - using Jetson-optimized where available" >> recommended_requirements.in && \
-    echo "vector_quantize_pytorch>=1.22.15  # Updated from 1.8.6 for compatibility" >> recommended_requirements.in && \
-    echo "torchao>=0.11.0  # Jetson-optimized version" >> recommended_requirements.in && \
-    echo "triton>=3.3.0  # Jetson-optimized version" >> recommended_requirements.in && \
-    echo "" >> recommended_requirements.in && \
-    echo "# Updated critical dependencies for better compatibility" >> recommended_requirements.in && \
-    echo "einops>=0.8.0  # Updated from 0.7.0 for compatibility with vector_quantize_pytorch" >> recommended_requirements.in && \
-    echo "" >> recommended_requirements.in
-
-# Create a helpful script for extracting the analysis results
+# Create extraction script
 RUN echo '#!/bin/bash' > /extract_analysis.sh && \
     echo 'mkdir -p /output' >> /extract_analysis.sh && \
     echo 'cp -r /dependency_analysis/* /output/' >> /extract_analysis.sh && \
     echo 'echo "Dependency analysis results extracted to /output"' >> /extract_analysis.sh && \
     chmod +x /extract_analysis.sh
 
-# Make the analysis results accessible even if the build fails
+# Make the analysis results accessible
 VOLUME /output
 
 # Command to run when starting the container
