@@ -45,6 +45,7 @@ echo "Extracting dependency information..."
 
 # Run the container, overriding its default command to robustly copy essential files
 # This prevents errors if optional files (like dependency_tree.dot/png) are not generated
+# Also copy any pip-compile error log
 docker run --rm \
     -v "${OUTPUT_DIR}:/output" \
     sesame-tts-analysis \
@@ -52,12 +53,26 @@ docker run --rm \
              cp -v /dependency_analysis/package_install_results.csv /output/ 2>/dev/null || echo 'Warning: package_install_results.csv not found.'; \
              cp -v /dependency_analysis/wheel_availability.txt /output/ 2>/dev/null || echo 'Warning: wheel_availability.txt not found.'; \
              cp -v /dependency_analysis/recommended_requirements.in /output/ 2>/dev/null || echo 'Warning: recommended_requirements.in not found.'; \
+             cp -v /dependency_analysis/pip_compile_error.log /output/ 2>/dev/null || true; \
              echo 'Dependency analysis results extracted to /output'"
+
 
 echo ""
 echo "==== Dependency Analysis Complete ===="
 echo "All dependency information has been extracted to ${OUTPUT_DIR}"
 echo ""
+
+# Check if pip-compile failed during analysis and add a warning
+PIP_COMPILE_ERROR_LOG="${OUTPUT_DIR}/pip_compile_error.log"
+if [ -f "$PIP_COMPILE_ERROR_LOG" ] && [ -s "$PIP_COMPILE_ERROR_LOG" ]; then
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo "!! WARNING: Dependency resolution failed during analysis.           !!"
+    echo "!! Review the error log for details:                                !!"
+    echo "!! ${PIP_COMPILE_ERROR_LOG} !!"
+    echo "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    echo ""
+fi
+
 echo "Key files to review:"
 echo "- ${OUTPUT_DIR}/analysis_report.md (overview of findings)"
 echo "- ${OUTPUT_DIR}/package_install_results.csv (individual package installation results)"
