@@ -1,10 +1,24 @@
-# Core ML Framework - Pinned to match base image/tested compatibility
-torch==2.2.0
-torchvision==0.17.0
-torchaudio==2.2.0
+# IMPORTANT NOTE ABOUT DEPENDENCY CONFLICT:
+# The original Sesame CSM requires moshi==0.2.2 which needs torch<2.7
+# But the latest Jetson-optimized wheels are for torch==2.7.0
+# We provide two options below - choose ONE approach by uncommenting:
 
-# VQ library - Pinned due to previous einops dependency conflict resolution
-vector_quantize_pytorch==1.22.15
+# OPTION 1: Use latest Jetson wheels (torch 2.7.0) but no moshi (may break CSM)
+torch==2.7.0
+torchvision==0.22.0
+torchaudio==2.7.0
+# moshi==0.2.2  # Commented out due to requiring torch<2.7
+
+# OPTION 2: Use slightly older torch compatible with moshi (may need compilation)
+# torch==2.2.0
+# torchvision==0.17.0
+# torchaudio==2.2.0
+# moshi==0.2.2  # Required by original Sesame CSM
+
+# Remaining dependencies - common to both approaches
+# Core ML Framework - Aligning with Jetson Index (JP6/cu128) 
+# VQ library - Version that works with torch>=2.0
+vector_quantize_pytorch>=1.22.15
 
 # Tokenization library - Flexible version
 tokenizers>=0.13.3
@@ -35,14 +49,15 @@ nltk>=3.8.1
 # Audio processing library (dependency for silentcipher examples) - Flexible version
 librosa>=0.9.0
 
-# Tensor operations library - Minimum version set to satisfy vector_quantize_pytorch
+# Tensor operations library - Version >=0.8.0 as per analysis recommendation
 einops>=0.8.0
 
-# PyTorch Acceleration & Optimization - Pinned for specific CSM features/compatibility
+# PyTorch Acceleration & Optimization libraries - NOTE: Check compatibility
 torchao==0.1.0
-# PyTorch Fine-tuning library - Pinned for specific CSM features/compatibility
 torchtune==0.3.0
-# Model serialization (Sesame specific?) - Pinned for specific CSM features/compatibility
-moshi==0.2.2
-# Watermarking/Encryption - Installing from PyPI as per original repo README
-# silentcipher>=1.0.1 # Removed due to torch==2.2.0 conflict
+
+# Watermarking/Encryption - Currently disabled
+# silentcipher>=1.0.1 # May require additional testing
+
+# Triton support - Check compatibility with torch 2.7
+triton==2.1.0
