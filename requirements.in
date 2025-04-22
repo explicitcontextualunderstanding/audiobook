@@ -4,9 +4,9 @@
 # We provide two options below - choose ONE approach by uncommenting:
 
 # OPTION 1: Use latest Jetson wheels (torch 2.7.0)
-torch==2.7.0
+torch==2.6.0
 torchvision==0.22.0
-torchaudio==2.7.0
+torchaudio==2.6.0
 moshi @ git+https://github.com/kyutai-labs/moshi.git@main#subdirectory=moshi
 
 # OPTION 2: Use slightly older torch compatible with moshi
