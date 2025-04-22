@@ -16,6 +16,9 @@ else
     echo "  sys.path.append('/opt/csm')"
     echo "  from generator import load_csm_1b, Generator"
     echo ""
+    echo "Bitsandbytes should be installed. You can test it with:"
+    echo "  python /opt/audiobook/docker/sesame-tts/utils/test_bitsandbytes.py"
+    echo ""
     echo "Starting interactive shell..."
     echo "================================"
     exec /bin/bash
