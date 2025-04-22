@@ -25,6 +25,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pip3 install --no-cache-dir pip-tools pipdeptree && \
     rm -rf /var/lib/apt/lists/*
 
++# Install Rust toolchain for packages requiring Cargo
++RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
++    . "$HOME/.cargo/env" && \
++    rustup default stable && \
++    rustup update && \
++    cargo --version
+
 # Create directory for dependency artifacts
 RUN mkdir -p /dependency_analysis
 
