@@ -43,10 +43,16 @@ echo ""
 echo "Analysis container built successfully!"
 echo "Extracting dependency information..."
 
-# Run the container to extract the dependency information
+# Run the container, overriding its default command to robustly copy essential files
+# This prevents errors if optional files (like dependency_tree.dot/png) are not generated
 docker run --rm \
     -v "${OUTPUT_DIR}:/output" \
-    sesame-tts-analysis
+    sesame-tts-analysis \
+    bash -c "cp -v /dependency_analysis/analysis_report.md /output/ 2>/dev/null || echo 'Warning: analysis_report.md not found.'; \
+             cp -v /dependency_analysis/package_install_results.csv /output/ 2>/dev/null || echo 'Warning: package_install_results.csv not found.'; \
+             cp -v /dependency_analysis/wheel_availability.txt /output/ 2>/dev/null || echo 'Warning: wheel_availability.txt not found.'; \
+             cp -v /dependency_analysis/recommended_requirements.in /output/ 2>/dev/null || echo 'Warning: recommended_requirements.in not found.'; \
+             echo 'Dependency analysis results extracted to /output'"
 
 echo ""
 echo "==== Dependency Analysis Complete ===="
@@ -57,6 +63,8 @@ echo "- ${OUTPUT_DIR}/analysis_report.md (overview of findings)"
 echo "- ${OUTPUT_DIR}/package_install_results.csv (individual package installation results)"
 echo "- ${OUTPUT_DIR}/wheel_availability.txt (ARM64 wheel availability)"
 echo "- ${OUTPUT_DIR}/recommended_requirements.in (suggested requirements.in with fixes)"
+# The .dot and .png files are often not generated, removing them from expected output
+# echo "- ${OUTPUT_DIR}/dependency_tree.dot / .png (visual dependency graph)"
 echo ""
 echo "To apply the recommended requirements:"
 echo "cp ${OUTPUT_DIR}/recommended_requirements.in ${REPO_ROOT}/docker/sesame-tts/requirements.in"
