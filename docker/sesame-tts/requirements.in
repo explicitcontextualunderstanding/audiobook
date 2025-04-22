@@ -1,5 +1,6 @@
 # Core PyTorch - using Jetson-optimized versions
-torch>=2.7.0
+-torch>=2.7.0
++torch>=2.6.0,<2.7.0
 torchvision>=0.22.0
 torchaudio>=2.7.0
 
