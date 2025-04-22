@@ -1,0 +1,136 @@
+# Dependency Analysis Dockerfile
+# Used to extract dependency information during the build process
+# Run with: DOCKER_BUILDKIT=1 docker build -f docker/sesame-tts/Dockerfile.analysis --target analysis -t sesame-tts-analysis .
+ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
+
+# ============================================================================
+# ANALYSIS STAGE: Extract dependency information during build
+# ============================================================================
+FROM ${BASE_IMAGE} AS analysis
+
+# Set environment variables for build optimization
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    NO_TORCH_COMPILE=1 \
+    DEBIAN_FRONTEND=noninteractive \
+    CONDA_DIR=/opt/conda \
+    PYTHONHASHSEED=0 \
+    PIP_DEFAULT_TIMEOUT=100 \
+    CARGO_HOME=/root/.cargo \
+    PATH="/root/.cargo/bin:/opt/conda/bin:$PATH"
+
+# Install essential tools for dependency analysis
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3-pip git curl wget && \
+    pip3 install --no-cache-dir pip-tools pipdeptree && \
+    rm -rf /var/lib/apt/lists/*
+
+# Create directory for dependency artifacts
+RUN mkdir -p /dependency_analysis
+
+# Copy requirements.in file (or requirements.txt if no .in exists)
+COPY docker/sesame-tts/requirements.in /dependency_analysis/requirements.in 2>/dev/null || \
+     COPY docker/sesame-tts/requirements.txt /dependency_analysis/requirements.in
+
+WORKDIR /dependency_analysis
+
+# Analyze package availability on Jetson PyPI index
+RUN echo "Checking package availability on Jetson PyPI index..." && \
+    for pkg in $(grep -v "^#" requirements.in | grep -v "^$" | cut -d'=' -f1 | cut -d'>' -f1 | cut -d'<' -f1 | tr -d ' '); do \
+        echo "Checking $pkg..." && \
+        pip index versions $pkg --index-url=https://pypi.jetson-ai-lab.dev/simple >> jetson_versions.txt 2>/dev/null || echo "$pkg: Not found on Jetson index" >> jetson_versions.txt; \
+    done
+
+# Try to generate a lock file (might fail, but we capture the output)
+RUN pip-compile --resolver=backtracking requirements.in -o requirements.lock.txt 2>&1 || touch pip_compile_error.txt
+
+# Check wheel availability for ARM64
+RUN echo "Checking wheel availability for ARM64..." && \
+    for pkg in $(grep -v "^#" requirements.in | grep -v "^$" | cut -d'=' -f1 | cut -d'>' -f1 | cut -d'<' -f1 | tr -d ' '); do \
+        echo "Checking $pkg for ARM64 wheels..." && \
+        { pip download --no-deps --only-binary=:all: --python-version=3.10 --platform=linux_aarch64 --index-url=https://pypi.jetson-ai-lab.dev/simple $pkg && echo "$pkg: ARM64 wheel available on Jetson index" >> wheel_availability.txt; } || \
+        { pip download --no-deps --only-binary=:all: --python-version=3.10 --platform=linux_aarch64 $pkg && echo "$pkg: ARM64 wheel available on PyPI" >> wheel_availability.txt; } || \
+        echo "$pkg: No ARM64 wheel available, source build required" >> wheel_availability.txt; \
+        rm -rf *.whl; \
+    done
+
+# Install Miniconda (needed for conda environment)
+RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh -o miniconda.sh && \
+    bash miniconda.sh -b -p /opt/conda && \
+    rm miniconda.sh
+
+# Create conda environment for analysis
+RUN /opt/conda/bin/conda create -y -n analysis python=3.10 pip && \
+    /opt/conda/bin/conda clean -ya
+
+# Try installing each package individually to identify problematic ones
+RUN echo "#!/bin/bash" > analyze_packages.sh && \
+    echo "source /opt/conda/bin/activate analysis" >> analyze_packages.sh && \
+    echo "echo 'Starting individual package installation analysis...'" >> analyze_packages.sh && \
+    echo "echo ''" >> analyze_packages.sh && \
+    echo "echo 'Package,Status,Error' > package_install_results.csv" >> analyze_packages.sh && \
+    for pkg in $(grep -v "^#" requirements.in | grep -v "^$"); do \
+        echo "echo 'Trying to install $pkg...'" >> analyze_packages.sh; \
+        echo "pip install --no-cache-dir --no-deps '$pkg' > /dev/null 2>tmp_error.txt && echo '$pkg,Success,' >> package_install_results.csv || echo '$pkg,Failed,\"'\$(cat tmp_error.txt | tr '\"' \"'\" | tr '\n' ' ')\"' >> package_install_results.csv" >> analyze_packages.sh; \
+    done && \
+    chmod +x analyze_packages.sh
+
+# Run the analysis and capture results
+RUN ./analyze_packages.sh || echo "Analysis completed with some failures"
+
+# Generate dependency analysis report
+RUN echo "# Dependency Analysis Report" > analysis_report.md && \
+    echo "" >> analysis_report.md && \
+    echo "## Package Installation Results" >> analysis_report.md && \
+    echo "" >> analysis_report.md && \
+    echo "| Package | Status | Error |" >> analysis_report.md && \
+    echo "|---------|--------|-------|" >> analysis_report.md && \
+    tail -n +2 package_install_results.csv | sed 's/,/|/g' | sed 's/^/|/g' | sed 's/$/|/g' >> analysis_report.md && \
+    echo "" >> analysis_report.md && \
+    echo "## ARM64 Wheel Availability" >> analysis_report.md && \
+    echo "" >> analysis_report.md && \
+    cat wheel_availability.txt | sed 's/^/- /g' >> analysis_report.md && \
+    echo "" >> analysis_report.md && \
+    echo "## Package Versions on Jetson PyPI Index" >> analysis_report.md && \
+    echo "" >> analysis_report.md && \
+    cat jetson_versions.txt >> analysis_report.md
+
+# Install as many packages as possible to generate a dependency tree
+RUN source /opt/conda/bin/activate analysis && \
+    pip install --no-cache-dir -r requirements.in || echo "Some packages failed to install" && \
+    pipdeptree > dependency_tree.txt 2>/dev/null || echo "Failed to generate dependency tree" && \
+    pipdeptree --warn all > dependency_conflicts.txt 2>/dev/null || echo "Failed to check for conflicts"
+
+# Generate recommended requirements.in based on analysis
+RUN echo "# Recommended requirements.in based on analysis" > recommended_requirements.in && \
+    echo "# Generated on: $(date)" >> recommended_requirements.in && \
+    echo "" >> recommended_requirements.in && \
+    echo "# Core PyTorch - using Jetson-optimized versions when available" >> recommended_requirements.in && \
+    echo "torch>=2.7.0  # Jetson-optimized version" >> recommended_requirements.in && \
+    echo "torchvision>=0.22.0  # Jetson-optimized version" >> recommended_requirements.in && \
+    echo "torchaudio>=2.7.0  # Jetson-optimized version" >> recommended_requirements.in && \
+    echo "" >> recommended_requirements.in && \
+    echo "# Libraries with specific version requirements - using Jetson-optimized where available" >> recommended_requirements.in && \
+    echo "vector_quantize_pytorch>=1.22.15  # Updated from 1.8.6 for compatibility" >> recommended_requirements.in && \
+    echo "torchao>=0.11.0  # Jetson-optimized version" >> recommended_requirements.in && \
+    echo "triton>=3.3.0  # Jetson-optimized version" >> recommended_requirements.in && \
+    echo "" >> recommended_requirements.in && \
+    echo "# Updated critical dependencies for better compatibility" >> recommended_requirements.in && \
+    echo "einops>=0.8.0  # Updated from 0.7.0 for compatibility with vector_quantize_pytorch" >> recommended_requirements.in && \
+    echo "" >> recommended_requirements.in && \
+    echo "# The following packages were initially problematic but may work with the above changes" >> recommended_requirements.in && \
+    grep -v "^#" requirements.in | grep -v "torch=\|torchvision=\|torchaudio=\|vector_quantize_pytorch=\|einops=\|torchao=\|triton=" >> recommended_requirements.in
+
+# Create a helpful script for extracting the analysis results
+RUN echo '#!/bin/bash' > /extract_analysis.sh && \
+    echo 'mkdir -p /output' >> /extract_analysis.sh && \
+    echo 'cp -r /dependency_analysis/* /output/' >> /extract_analysis.sh && \
+    echo 'echo "Dependency analysis results extracted to /output"' >> /extract_analysis.sh && \
+    chmod +x /extract_analysis.sh
+
+# Make the analysis results accessible even if the build fails
+VOLUME /output
+
+# Command to run when starting the container
+CMD ["/extract_analysis.sh"]
