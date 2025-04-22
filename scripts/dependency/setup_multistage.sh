@@ -61,19 +61,37 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONHASHSEED=0 \
     PIP_DEFAULT_TIMEOUT=100 \
     CUDA_MODULE_LOADING=LAZY \
-    TORCH_USE_CUDA_DSA=1
+    TORCH_USE_CUDA_DSA=1 \
+    # Add Cargo to PATH for Rust compilation
+    CARGO_HOME=/root/.cargo \
+    PATH="/root/.cargo/bin:${PATH}"
 
-# Install pip-tools for dependency resolution
+# Install pip-tools and essential build tools including Rust
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3-pip git && \
+    python3-pip git curl build-essential && \
     pip install pip-tools && \
+    # Install Rust toolchain
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y && \
+    # Verify cargo installation
+    cargo --version && \
     rm -rf /var/lib/apt/lists/*
+
+# Configure pip to use Jetson-optimized wheels (helps resolver find compatible versions)
+RUN mkdir -p ~/.config/pip && \
+    echo "[global]" > ~/.config/pip/pip.conf && \
+    echo "index-url = https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
+    echo "extra-index-url = https://pypi.ngc.nvidia.com https://pypi.org/simple" >> ~/.config/pip/pip.conf && \
+    echo "timeout = 120" >> ~/.config/pip/pip.conf && \
+    echo "retries = 5" >> ~/.config/pip/pip.conf
 
 # Copy requirements.in to generate the lock file
 COPY docker/sesame-tts/requirements.in .
 
 # Generate the lock file with backtracking resolver
-RUN pip-compile --resolver=backtracking --output-file=requirements.lock.txt requirements.in
+# Use --verbose flag for more detailed output if needed
+RUN pip-compile --resolver=backtracking --output-file=requirements.lock.txt requirements.in && \
+    # Verify the lock file was created
+    test -f requirements.lock.txt || (echo "Failed to generate requirements.lock.txt" && exit 1)
 
 # ============================================================================
 # WHEEL BUILDER STAGE: Build or download all required wheels
@@ -108,17 +126,6 @@ RUN mkdir -p ~/.config/pip && \
 
 # Copy the lock file from the resolver stage
 COPY --from=resolver requirements.lock.txt .
-
-# Install Rust toolchain (cargo) for compiling extensions
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | bash -s -- -y && \
-    echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> /etc/profile.d/rust.sh && \
-    chmod +x /etc/profile.d/rust.sh && \
-    . $HOME/.cargo/env && \
-    rustup default stable && \
-    rustup update
-
-# Ensure Rust binaries are available in PATH for all subsequent steps
-ENV PATH="/root/.cargo/bin:$PATH"
 
 # Download wheels to a dedicated directory
 RUN --mount=type=cache,target=/root/.cache/pip \
