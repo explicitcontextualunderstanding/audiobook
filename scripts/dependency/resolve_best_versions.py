@@ -338,7 +338,7 @@ class VersionResolver:
             
             # Updated other critical dependencies
             f.write("# Updated other critical dependencies for better compatibility\n")
-            for pkg in ['einops', 'silentcipher', 'librosa']:
+            for pkg in ['einops', 'librosa']:
                 if pkg in recommendations:
                     rec = recommendations[pkg]
                     f.write(f"{pkg}{rec['recommendation']}  # {rec['reason']}\n")
