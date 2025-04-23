@@ -10,18 +10,9 @@ CSM_1B_GH_WATERMARK = [212, 211, 146, 56, 201]
 
 def load_watermarker(device: str = "cuda"):
     """
-    Return a dummy watermarker object if silentcipher isn't available
+    Return a dummy watermarker object
     """
-    try:
-        import silentcipher
-        model = silentcipher.get_model(
-            model_type="44.1k",
-            device=device,
-        )
-        return model
-    except ImportError:
-        print("Warning: silentcipher not available, using dummy watermarker")
-        return DummyWatermarker()
+    return DummyWatermarker()
     
 class DummyWatermarker:
     """

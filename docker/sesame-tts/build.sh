@@ -86,11 +86,6 @@ pip install --no-cache-dir --prefer-binary \
     --extra-index-url https://pypi.org/simple \
     -r requirements.txt
 
-# Install special dependencies
-echo "🔧 Installing specialized packages..."
-#pip install --no-cache-dir --prefer-binary \
-#    "silentcipher @ git+https://github.com/SesameAILabs/silentcipher@v1.0.2"
-
 # Force reinstall moshi to ensure correct version
 pip install --force-reinstall --no-cache-dir --prefer-binary \
     --index-url https://pypi.jetson-ai-lab.dev/simple \

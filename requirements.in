@@ -35,8 +35,6 @@ PyPDF2>=3.0.1
 pdfminer.six>=20221105
 # Natural language processing toolkit (for sentence splitting) - Flexible version
 nltk>=3.8.1
-# Audio processing library (dependency for silentcipher examples) - Flexible version
-librosa>=0.9.0
 
 # Tensor operations library - Version >=0.8.0 as per analysis recommendation
 einops>=0.8.0
@@ -44,9 +42,6 @@ einops>=0.8.0
 # PyTorch Acceleration & Optimization libraries - NOTE: Check compatibility with torch==2.6.0
 torchao==0.1.0
 torchtune==0.3.0
-
-# Watermarking/Encryption - Currently disabled
-# silentcipher>=1.0.1 # May require additional testing
 
 # Triton support - Check compatibility with torch 2.6.0
 tritonclient[all]==2.55.0  # Aligns with Triton Server v2.55.0

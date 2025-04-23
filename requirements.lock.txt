@@ -67,9 +67,6 @@ torchtune==0.3.0
 # Model serialization (Sesame specific?) - Pinned
 moshi==0.2.2
 
-# Watermarking/Encryption - Locked version based on >=1.0.1
-#silentcipher==1.0.1
-
 # Triton Inference Server client/utils - Pinned (will likely use fallback PyPI)
 triton==2.1.0
 
