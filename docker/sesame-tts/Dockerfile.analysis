@@ -37,9 +37,9 @@ RUN mkdir -p /dependency_analysis
 
 # Create default requirements.in with recommended values
 RUN echo "# Core PyTorch - using Jetson-optimized versions" > /dependency_analysis/requirements.in && \
-    echo "torch>=2.7.0" >> /dependency_analysis/requirements.in && \
-    echo "torchvision>=0.22.0" >> /dependency_analysis/requirements.in && \
-    echo "torchaudio>=2.7.0" >> /dependency_analysis/requirements.in && \
+    echo "torch>=2.6.0" >> /dependency_analysis/requirements.in && \
+    echo "torchvision>=0.21.0" >> /dependency_analysis/requirements.in && \
+    echo "torchaudio>=2.6.0" >> /dependency_analysis/requirements.in && \
     echo "" >> /dependency_analysis/requirements.in && \
     echo "# Libraries with specific version requirements" >> /dependency_analysis/requirements.in && \
     echo "vector_quantize_pytorch>=1.22.15" >> /dependency_analysis/requirements.in && \

@@ -1,6 +1,6 @@
 # Core PyTorch - using Jetson-optimized versions
 torch>=2.6.0,<2.7.0
-torchvision>=0.22.0
+torchvision>=0.21.0
 torchaudio>=2.6.0,<2.7.0
 
 # Libraries with specific version requirements - using Jetson-optimized where available
@@ -30,3 +30,10 @@ PyPDF2>=3.0.1
 
 # Text extraction & NLP (continued)
 pdfminer.six>=20221105
+
+# Other utilities
+# sphn>=0.1.4
+rotary_embedding_torch>=0.2.5
+datasets>=2.16.1
+tqdm>=4.66.1
+psutil>=5.9.6
