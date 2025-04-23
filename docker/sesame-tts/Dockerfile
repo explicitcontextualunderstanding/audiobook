@@ -122,6 +122,7 @@ COPY --from=resolver /tmp/requirements.lock.txt /tmp/requirements.lock.txt
 # Install Python dependencies using the lock file with BuildKit caching
 SHELL ["/bin/bash", "-c"]
 RUN --mount=type=cache,target=/root/.cache/pip \
+    sed -i '/bitsandbytes==0.45.5/d' /tmp/requirements.lock.txt && \
     source /opt/conda/bin/activate tts && \
     echo "Installing Python dependencies from lock file..." && \
     pip install --no-cache-dir --prefer-binary -r /tmp/requirements.lock.txt && \
