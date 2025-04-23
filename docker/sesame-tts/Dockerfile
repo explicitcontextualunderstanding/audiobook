@@ -50,6 +50,7 @@ COPY requirements.in /tmp/requirements.in
 # Generate the lock file with backtracking resolver
 # Remove silentcipher from requirements.in before compiling to avoid torch version conflicts
 RUN sed -i '/silentcipher/d' /tmp/requirements.in && \
+    sed -i '/bitsandbytes==0.45.5/d' /tmp/requirements.in && \
     pip-compile --resolver=backtracking --output-file=/tmp/requirements.lock.txt /tmp/requirements.in && \
     # Verify the lock file was created
     test -f /tmp/requirements.lock.txt || (echo "Failed to generate requirements.lock.txt" && exit 1)
