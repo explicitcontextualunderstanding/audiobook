@@ -69,7 +69,6 @@ $PYTHON_VERSION -m pip install --no-cache-dir --prefer-binary \
     pdfminer.six==20221105 \
     nltk==3.8.1 \
     einops==0.7.0 \
-    sphn==0.1.4 \
     rotary_embedding_torch==0.2.5 \
     vector_quantize_pytorch==1.8.6 \
     datasets==2.16.1 \

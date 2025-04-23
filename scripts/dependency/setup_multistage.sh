@@ -342,7 +342,6 @@ moshi==0.2.2                      # Required for model interface
 
 # Other utilities
 einops>=0.8.0                    # Updated for compatibility
-sphn>=0.1.4
 rotary_embedding_torch>=0.2.5
 datasets>=2.16.1
 triton>=2.1.0

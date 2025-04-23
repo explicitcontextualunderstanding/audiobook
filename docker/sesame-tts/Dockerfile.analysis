@@ -68,7 +68,6 @@ RUN echo "# Core PyTorch - using Jetson-optimized versions" > /dependency_analys
     echo "pdfminer.six>=20221105" >> /dependency_analysis/requirements.in && \
     echo "" >> /dependency_analysis/requirements.in && \
     echo "# Other utilities" >> /dependency_analysis/requirements.in && \
-    echo "sphn>=0.1.4" >> /dependency_analysis/requirements.in && \
     echo "rotary_embedding_torch>=0.2.5" >> /dependency_analysis/requirements.in && \
     echo "datasets>=2.16.1" >> /dependency_analysis/requirements.in && \
     echo "tqdm>=4.66.1" >> /dependency_analysis/requirements.in && \
