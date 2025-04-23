@@ -1,6 +1,8 @@
 # Optimized Dockerfile for faster build times with BuildKit
 # Use with: DOCKER_BUILDKIT=1 docker build -t sesame-tts-jetson .
+# dustynv/pytorch:2.7-r36.4.0-cu128-24.04
 ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
+
 
 # ============================================================================
 # RESOLVER STAGE: Generate the lock file to capture all dependencies
@@ -46,7 +48,9 @@ RUN mkdir -p ~/.config/pip && \
 COPY requirements.in /tmp/requirements.in
 
 # Generate the lock file with backtracking resolver
-RUN pip-compile --resolver=backtracking --output-file=/tmp/requirements.lock.txt /tmp/requirements.in && \
+# Remove silentcipher from requirements.in before compiling to avoid torch version conflicts
+RUN sed -i '/silentcipher/d' /tmp/requirements.in && \
+    pip-compile --resolver=backtracking --output-file=/tmp/requirements.lock.txt /tmp/requirements.in && \
     # Verify the lock file was created
     test -f /tmp/requirements.lock.txt || (echo "Failed to generate requirements.lock.txt" && exit 1)
 
