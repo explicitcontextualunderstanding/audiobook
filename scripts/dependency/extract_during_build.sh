@@ -45,7 +45,7 @@ echo "Extracting dependency information..."
 
 # Run the container, overriding its default command to robustly copy essential files
 # This prevents errors if optional files (like dependency_tree.dot/png) are not generated
-# Also copy any pip-compile error log
+# Also copy any pip-compile error log and pipdeptree outputs
 docker run --rm \
     -v "${OUTPUT_DIR}:/output" \
     sesame-tts-analysis \
@@ -55,7 +55,6 @@ docker run --rm \
         cp -v /dependency_analysis/wheel_availability.txt /output/ 2>/dev/null || echo 'Warning: wheel_availability.txt not found.'; \
         cp -v /dependency_analysis/recommended_requirements.in /output/ 2>/dev/null || echo 'Warning: recommended_requirements.in not found.'; \
         cp -v /dependency_analysis/pip_compile_error.log /output/ 2>/dev/null || true; \
-        # Output pipdeptree in both JSON and text formats
         if command -v pipdeptree >/dev/null 2>&1; then \
             pipdeptree --json-tree > /output/pipdeptree.json 2>/dev/null || echo 'Warning: pipdeptree.json not generated.'; \
             pipdeptree > /output/pipdeptree.txt 2>/dev/null || echo 'Warning: pipdeptree.txt not generated.'; \
