@@ -49,13 +49,20 @@ echo "Extracting dependency information..."
 docker run --rm \
     -v "${OUTPUT_DIR}:/output" \
     sesame-tts-analysis \
-    bash -c "cp -v /dependency_analysis/analysis_report.md /output/ 2>/dev/null || echo 'Warning: analysis_report.md not found.'; \
-             cp -v /dependency_analysis/package_install_results.csv /output/ 2>/dev/null || echo 'Warning: package_install_results.csv not found.'; \
-             cp -v /dependency_analysis/wheel_availability.txt /output/ 2>/dev/null || echo 'Warning: wheel_availability.txt not found.'; \
-             cp -v /dependency_analysis/recommended_requirements.in /output/ 2>/dev/null || echo 'Warning: recommended_requirements.in not found.'; \
-             cp -v /dependency_analysis/pip_compile_error.log /output/ 2>/dev/null || true; \
-             echo 'Dependency analysis results extracted to /output'"
-
+    bash -c "\
+        cp -v /dependency_analysis/analysis_report.md /output/ 2>/dev/null || echo 'Warning: analysis_report.md not found.'; \
+        cp -v /dependency_analysis/package_install_results.csv /output/ 2>/dev/null || echo 'Warning: package_install_results.csv not found.'; \
+        cp -v /dependency_analysis/wheel_availability.txt /output/ 2>/dev/null || echo 'Warning: wheel_availability.txt not found.'; \
+        cp -v /dependency_analysis/recommended_requirements.in /output/ 2>/dev/null || echo 'Warning: recommended_requirements.in not found.'; \
+        cp -v /dependency_analysis/pip_compile_error.log /output/ 2>/dev/null || true; \
+        # Output pipdeptree in both JSON and text formats
+        if command -v pipdeptree >/dev/null 2>&1; then \
+            pipdeptree --json-tree > /output/pipdeptree.json 2>/dev/null || echo 'Warning: pipdeptree.json not generated.'; \
+            pipdeptree > /output/pipdeptree.txt 2>/dev/null || echo 'Warning: pipdeptree.txt not generated.'; \
+        else \
+            echo 'Warning: pipdeptree not installed.'; \
+        fi; \
+        echo 'Dependency analysis results extracted to /output'"
 
 echo ""
 echo "==== Dependency Analysis Complete ===="
