@@ -339,7 +339,7 @@ vector_quantize_pytorch==1.22.15  # Must use this version for compatibility
 torchtune==0.3.0                  # Performance-critical component
 torchao==0.1.0                    # Performance-critical component
 moshi==0.2.2                      # Required for model interface
-silentcipher>=1.0.1               # Now available via PyPI
+#silentcipher>=1.0.1               # Now available via PyPI
 librosa>=0.10.1                   # Required by silentcipher
 
 # Other utilities

@@ -88,8 +88,8 @@ pip install --no-cache-dir --prefer-binary \
 
 # Install special dependencies
 echo "🔧 Installing specialized packages..."
-pip install --no-cache-dir --prefer-binary \
-    "silentcipher @ git+https://github.com/SesameAILabs/silentcipher@v1.0.2"
+#pip install --no-cache-dir --prefer-binary \
+#    "silentcipher @ git+https://github.com/SesameAILabs/silentcipher@v1.0.2"
 
 # Force reinstall moshi to ensure correct version
 pip install --force-reinstall --no-cache-dir --prefer-binary \

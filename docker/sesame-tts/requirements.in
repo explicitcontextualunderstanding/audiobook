@@ -12,7 +12,7 @@ einops>=0.8.0
 triton>=3.3.0
 torchtune>=0.3.0
 moshi>=0.2.2
-silentcipher>=1.0.1
+#silentcipher>=1.0.1
 librosa>=0.10.1
 
 # Transformers & Tokenizers - minimal versions to reduce download size
