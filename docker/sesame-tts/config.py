@@ -30,7 +30,7 @@ sesame_tts = package(
     name='sesame-tts',
     license='https://github.com/SesameAILabs/csm',
     depends=[
-        'python:3.10',
+        'python:3.12',
         'pytorch:2.6',
         'cuda',
         'ffmpeg',
@@ -51,7 +51,7 @@ sesame_tts_minimal = package(
     name='sesame-tts:minimal',
     license='https://github.com/SesameAILabs/csm',
     depends=[
-        'python:3.10',
+        'python:3.12',
         'pytorch:2.6',
         'cuda'
     ],

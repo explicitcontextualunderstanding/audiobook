@@ -15,7 +15,7 @@ echo "Configuring Conda..."
 
 # Create Conda environment
 echo "Creating Conda environment..."
-/opt/conda/bin/conda create -y -n tts python=3.10 pip setuptools wheel
+/opt/conda/bin/conda create -y -n tts python=3.12 pip setuptools wheel
 /opt/conda/bin/conda clean -ya
 
 # Install Python dependencies

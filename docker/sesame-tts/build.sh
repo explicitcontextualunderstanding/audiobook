@@ -46,8 +46,8 @@ wait $CONDA_PID
 
 export PATH="$CONDA_DIR/bin:$PATH"
 
-echo "🌐 Creating optimized conda env with Python 3.10..."
-conda create -y -n tts python=3.10 \
+echo "🌐 Creating optimized conda env with Python 3.12..."
+conda create -y -n tts python=3.12 \
     pip setuptools wheel
 conda clean -ya
 

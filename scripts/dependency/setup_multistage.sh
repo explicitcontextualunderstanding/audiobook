@@ -173,7 +173,7 @@ RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch
     /opt/conda/bin/conda config --set channel_priority flexible && \
     /opt/conda/bin/conda config --set pip_interop_enabled True && \
     /opt/conda/bin/conda config --add channels conda-forge && \
-    /opt/conda/bin/conda create -y -n tts python=3.10 pip setuptools wheel && \
+    /opt/conda/bin/conda create -y -n tts python=3.12 pip setuptools wheel && \
     /opt/conda/bin/conda clean -ya
 
 # Ensure Conda is available in PATH

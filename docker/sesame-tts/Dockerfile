@@ -4,8 +4,8 @@
 # NOTE:
 # The base image dustynv/pytorch:2.6-r36.4.0-cu128-24.04 is built with Python 3.12 (cp312).
 # Jetson-optimized wheels on https://pypi.jetson-ai-lab.dev/jp6/cu128 are available for Python 3.12,
-# but not for Python 3.10. If you use this base image, ensure all dependencies and wheels are for Python 3.12.
-# If you need Python 3.10 support, you may need to build from source or use a different base image.
+# but not for previous versions of Python. If you use this base image, ensure all dependencies and wheels are for Python 3.12.
+# If you need previous versions of Python support, you may need to build from source or use a different base image.
 
 ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
 
@@ -110,7 +110,7 @@ RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch
     /opt/conda/bin/conda config --set channel_priority flexible && \
     /opt/conda/bin/conda config --set pip_interop_enabled True && \
     /opt/conda/bin/conda config --add channels conda-forge && \
-    /opt/conda/bin/conda create -y -n tts python=3.10 pip setuptools wheel && \
+    /opt/conda/bin/conda create -y -n tts python=3.12 pip setuptools wheel && \
     /opt/conda/bin/conda clean -ya
 
 # Install ffmpeg

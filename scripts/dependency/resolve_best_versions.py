@@ -94,7 +94,7 @@ class VersionResolver:
                     sys.executable, "-m", "pip", "download",
                     "--no-deps",
                     "--only-binary=:all:",
-                    f"--python-version=3.10",
+                    f"--python-version=3.12",
                     f"--platform=linux_aarch64",
                     f"--index-url=https://pypi.jetson-ai-lab.dev/simple",
                     package
@@ -108,7 +108,7 @@ class VersionResolver:
                     sys.executable, "-m", "pip", "download",
                     "--no-deps",
                     "--only-binary=:all:",
-                    f"--python-version=3.10",
+                    f"--python-version=3.12",
                     f"--platform=linux_aarch64",
                     package
                 ]

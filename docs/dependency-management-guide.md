@@ -139,7 +139,7 @@ import sys
 
 for req in pkg_resources.parse_requirements(open('requirements.lock.txt')):
     try:
-        subprocess.check_output(['pip', 'download', '--no-deps', '--python-version', '3.10', '--platform', 'linux_aarch64', '--only-binary=:all:', str(req)])
+        subprocess.check_output(['pip', 'download', '--no-deps', '--python-version', '3.12', '--platform', 'linux_aarch64', '--only-binary=:all:', str(req)])
     except subprocess.CalledProcessError:
         print(f'{req} - needs to be built from source')
 "
@@ -255,7 +255,7 @@ chmod +x ~/workspace/audiobook/scripts/dependency/analyze.sh
 cd ~/workspace/audiobook
 
 # Generate the lock file
-docker run --rm -v $(pwd)/docker/sesame-tts:/work -w /work python:3.10 pip-compile --resolver=backtracking -o requirements.lock.txt requirements.in
+docker run --rm -v $(pwd)/docker/sesame-tts:/work -w /work python:3.12 pip-compile --resolver=backtracking -o requirements.lock.txt requirements.in
 ```
 
 2. **Building with the new dependency system**:

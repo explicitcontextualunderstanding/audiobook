@@ -94,7 +94,7 @@ for pkg in $(grep -v "^#" "${REQUIREMENTS_LOCK}" | grep -v "^-e" | grep -v "^$")
     pkg_ver=${pkg##*==}
     
     echo -n "Checking ${pkg_name}... "
-    if pip download --no-deps --python-version 3.10 --platform linux_aarch64 --only-binary=:all: "${pkg}" &>/dev/null; then
+    if pip download --no-deps --python-version 3.12 --platform linux_aarch64 --only-binary=:all: "${pkg}" &>/dev/null; then
         echo "✅ Has ARM64 wheel"
     else
         echo "⚠️ Needs source build"

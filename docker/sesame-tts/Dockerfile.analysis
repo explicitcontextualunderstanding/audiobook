@@ -89,9 +89,9 @@ RUN pip-compile --resolver=backtracking requirements.in -o requirements.lock.txt
 # Check wheel availability for ARM64
 RUN for pkg in torch torchvision torchaudio vector_quantize_pytorch torchao einops triton torchtune moshi; do \
         echo "Checking $pkg for ARM64 wheels..." && \
-        (pip download --no-deps --only-binary=:all: --python-version=3.10 --platform=linux_aarch64 --index-url=https://pypi.jetson-ai-lab.dev/simple $pkg && \
+        (pip download --no-deps --only-binary=:all: --python-version=3.12 --platform=linux_aarch64 --index-url=https://pypi.jetson-ai-lab.dev/simple $pkg && \
          echo "$pkg: ARM64 wheel available on Jetson index" >> wheel_availability.txt) || \
-        (pip download --no-deps --only-binary=:all: --python-version=3.10 --platform=linux_aarch64 $pkg && \
+        (pip download --no-deps --only-binary=:all: --python-version=3.12 --platform=linux_aarch64 $pkg && \
          echo "$pkg: ARM64 wheel available on PyPI" >> wheel_availability.txt) || \
         echo "$pkg: No ARM64 wheel available, source build required" >> wheel_availability.txt; \
         find . -name "*.whl" -delete; \
@@ -103,7 +103,7 @@ RUN curl -fsSL https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch
     rm miniconda.sh
 
 # Create conda environment for analysis
-RUN /opt/conda/bin/conda create -y -n analysis python=3.10 pip && \
+RUN /opt/conda/bin/conda create -y -n analysis python=3.12 pip && \
     /opt/conda/bin/conda clean -ya
 
 # Script to test installing packages individually
