@@ -234,6 +234,8 @@ python generate_audiobook_piper.py --pdf /data/learning_with_ai.pdf --output /da
 
 ### 3.1 Set Up Environment for Sesame CSM
 
+> **Note:** The `torchtune` package has a hard dependency on `sphn`, a Rust-based package that must be built from source and is not available as a prebuilt wheel for Jetson/ARM64. This can cause build failures unless you have a working Rust toolchain and compatible build environment. If you do not need `torchtune`, it is recommended to remove it from your requirements to avoid these issues.
+
 > **Recommended:** Use the dependency analysis results to avoid version conflicts and ensure Jetson compatibility.
 >
 > 1. Run the dependency extraction script (if not already done):
