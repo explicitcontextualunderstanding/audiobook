@@ -11,6 +11,7 @@ This document outlines a comprehensive plan for converting a 230-page PDF book i
 - At least 5GB of available RAM
 - At least 20GB of free storage space
 - Internet connection for downloading models
+- **Python 3.12 (standardizing on this version for all builds and dependencies)**
 
 ### 1.2 Clone the jetson-containers Repository
 ```bash
@@ -234,7 +235,9 @@ python generate_audiobook_piper.py --pdf /data/learning_with_ai.pdf --output /da
 
 ### 3.1 Set Up Environment for Sesame CSM
 
-> **Note:** The `torchtune` package has a hard dependency on `sphn`, a Rust-based package that must be built from source and is not available as a prebuilt wheel for Jetson/ARM64. This can cause build failures unless you have a working Rust toolchain and compatible build environment. If you do not need `torchtune`, it is recommended to remove it from your requirements to avoid these issues.
+> **Note:** The project is now standardizing on **Python 3.12** for all builds and dependencies to maximize compatibility with Jetson-optimized wheels and simplify dependency management.
+>
+> We are also actively working to resolve issues with `torchtune` and its dependency `sphn`. `torchtune` is included in the requirements to support advanced LLM workflows, but it pulls in `sphn`, which is a Rust-based package that must be built from source and can cause build failures on Jetson/ARM64. If you do not need `torchtune`, you may comment it out in your requirements to avoid these issues.
 
 > **Recommended:** Use the dependency analysis results to avoid version conflicts and ensure Jetson compatibility.
 >

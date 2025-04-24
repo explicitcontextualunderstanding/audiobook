@@ -8,7 +8,10 @@ vector_quantize_pytorch>=1.22.15
 torchao>=0.11.0
 einops>=0.8.0
 triton>=3.3.0
-torchtune>=0.3.0
+# torchtune is included for LLM workflows but pulls in sphn, which requires a Rust build and Opus/CMake compatibility.
+# On Jetson/ARM64, this may cause build failures due to sphn's native build requirements.
+# If you do not need torchtune, comment out the line below to avoid these issues.
+#torchtune>=0.3.0
 moshi>=0.2.2
 
 # Transformers & Tokenizers - minimal versions to reduce download size
