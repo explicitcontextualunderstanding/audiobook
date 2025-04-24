@@ -298,10 +298,10 @@ RUN mkdir -p /audiobook_data /books /segments
 
 # Copy utility scripts and application files
 # These should exist in your repository structure
-COPY docker/sesame-tts/utils/audiobook_generator.py /opt/csm/ || echo "audiobook_generator.py not found"
-COPY docker/sesame-tts/utils/watermarking.py /opt/csm/ || echo "watermarking.py not found"
-COPY docker/sesame-tts/utils/ /opt/utils/ || echo "utils directory not found"
-COPY docker/sesame-tts/entrypoint.sh /entrypoint.sh || echo "entrypoint.sh not found"
+COPY docker/sesame-tts/utils/audiobook_generator.py /opt/csm/ 2>/dev/null || true
+COPY docker/sesame-tts/utils/watermarking.py /opt/csm/ 2>/dev/null || true
+COPY docker/sesame-tts/utils/ /opt/utils/ 2>/dev/null || true
+COPY docker/sesame-tts/entrypoint.sh /entrypoint.sh 2>/dev/null || true
 
 # Set up environment 
 ENV PATH="/opt/tritonserver/bin:/opt/conda/bin:${PATH}" \
