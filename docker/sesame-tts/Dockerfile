@@ -132,6 +132,8 @@ SHELL ["/bin/bash", "-c"]
 RUN --mount=type=cache,target=/root/.cache/pip \
     sed -i '/bitsandbytes/d' /tmp/requirements.lock.txt && \
     sed -i '/sphn/d' /tmp/requirements.lock.txt && \
+    sed -i '/torchao/d' /tmp/requirements.lock.txt && \
+    sed -i '/torchtune/d' /tmp/requirements.lock.txt && \
     source /opt/conda/bin/activate tts && \
     echo "Installing Python dependencies from lock file..." && \
     pip install --no-cache-dir --prefer-binary -r /tmp/requirements.lock.txt && \
