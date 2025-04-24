@@ -1,6 +1,12 @@
 # Optimized Dockerfile for faster build times with BuildKit
 # Use with: DOCKER_BUILDKIT=1 docker build -t sesame-tts-jetson .
 # dustynv/pytorch:2.7-r36.4.0-cu128-24.04
+# NOTE:
+# The base image dustynv/pytorch:2.6-r36.4.0-cu128-24.04 is built with Python 3.12 (cp312).
+# Jetson-optimized wheels on https://pypi.jetson-ai-lab.dev/jp6/cu128 are available for Python 3.12,
+# but not for Python 3.10. If you use this base image, ensure all dependencies and wheels are for Python 3.12.
+# If you need Python 3.10 support, you may need to build from source or use a different base image.
+
 ARG BASE_IMAGE=dustynv/pytorch:2.6-r36.4.0-cu128-24.04
 
 
@@ -48,9 +54,10 @@ RUN mkdir -p ~/.config/pip && \
 COPY requirements.in /tmp/requirements.in
 
 # Generate the lock file with backtracking resolver
-# Remove silentcipher from requirements.in before compiling to avoid torch version conflicts
+# Remove silentcipher and bitsandbytes from requirements.in before compiling to avoid torch version conflicts and ARM64 wheel issues.
+# If using moshi, bitsandbytes may still be pulled in as a transitive dependency.
 RUN sed -i '/silentcipher/d' /tmp/requirements.in && \
-    sed -i '/bitsandbytes==0.45.5/d' /tmp/requirements.in && \
+    sed -i '/bitsandbytes/d' /tmp/requirements.in && \
     pip-compile --resolver=backtracking --output-file=/tmp/requirements.lock.txt /tmp/requirements.in && \
     # Verify the lock file was created
     test -f /tmp/requirements.lock.txt || (echo "Failed to generate requirements.lock.txt" && exit 1)
@@ -122,7 +129,7 @@ COPY --from=resolver /tmp/requirements.lock.txt /tmp/requirements.lock.txt
 # Install Python dependencies using the lock file with BuildKit caching
 SHELL ["/bin/bash", "-c"]
 RUN --mount=type=cache,target=/root/.cache/pip \
-    sed -i '/bitsandbytes==0.45.5/d' /tmp/requirements.lock.txt && \
+    sed -i '/bitsandbytes/d' /tmp/requirements.lock.txt && \
     source /opt/conda/bin/activate tts && \
     echo "Installing Python dependencies from lock file..." && \
     pip install --no-cache-dir --prefer-binary -r /tmp/requirements.lock.txt && \

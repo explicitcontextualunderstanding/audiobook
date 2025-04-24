@@ -612,9 +612,16 @@ source "$HOME/.cargo/env"
 # Then retry pip install
 
 # If PyTorch fails to install
-# Ensure you are using the correct index URLs for Jetson wheels
+# Jetson wheels may not always be available on https://pypi.jetson-ai-lab.dev/jp6/cu128.
+# This index may only provide wheels for Python 3.12 (cp312) and the very latest package versions.
+# If you see "No matching distribution found" errors, try:
+# 1. Use the official PyPI index (https://pypi.org/simple) or NVIDIA's NGC index.
+# 2. Remove or adjust the Jetson index URL in your pip.conf or Dockerfile if needed.
+# 3. Make sure your Python version matches the available wheels (e.g., Python 3.12 for cp312 wheels).
+# 4. Install from source or use prebuilt wheels from NVIDIA/Jetson forums if available.
+
 # Example for manual install:
-# pip install --extra-index-url https://pypi.ngc.nvidia.com --extra-index-url https://pypi.jetson-ai-lab.dev/simple torch torchvision torchaudio
+pip install --extra-index-url https://pypi.ngc.nvidia.com torch torchvision torchaudio
 
 # For audio library issues
 sudo apt install -y libasound2-dev portaudio19-dev libportaudio2 libportaudiocpp0 ffmpeg libav-tools libsndfile1
