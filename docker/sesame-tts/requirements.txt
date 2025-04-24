@@ -28,9 +28,8 @@ nltk==3.8.1
 # moshi==0.2.2
 
 # Other utilities
-einops==0.7.0
-rotary_embedding_torch==0.2.5
-vector_quantize_pytorch==1.8.6
+einops==0.8.1
+vector_quantize_pytorch==1.22.15
 datasets==2.16.1
 
 # System utils
