@@ -53,7 +53,7 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
 # Configure pip to use Jetson-optimized wheels when available
 RUN mkdir -p ~/.config/pip && \
     echo "[global]" > ~/.config/pip/pip.conf && \
-    echo "index-url = https://pypi.org/simple" > ~/.config/pip/pip.conf && \
+    echo "index-url = https://pypi.org/simple" >> ~/.config/pip/pip.conf && \
     echo "extra-index-url = https://pypi.ngc.nvidia.com https://pypi.jetson-ai-lab.dev/simple" >> ~/.config/pip/pip.conf && \
     echo "timeout = 120" >> ~/.config/pip/pip.conf && \
     echo "retries = 5" >> ~/.config/pip/pip.conf
@@ -326,7 +326,7 @@ RUN if [ -f "/tmp/setup/utils/audiobook_generator.py" ]; then \
       chmod +x /entrypoint.sh; \
     fi && \
     rm -rf /tmp/setup
-    
+
 # Set up environment 
 ENV PATH="/opt/tritonserver/bin:/opt/conda/bin:${PATH}" \
     MODELS_DIR=/models \
