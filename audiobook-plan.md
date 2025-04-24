@@ -233,8 +233,33 @@ python generate_audiobook_piper.py --pdf /data/learning_with_ai.pdf --output /da
 ## 3. Approach 2: Generating Audiobook with Sesame CSM
 
 ### 3.1 Set Up Environment for Sesame CSM
+
+> **Recommended:** Use the dependency analysis results to avoid version conflicts and ensure Jetson compatibility.
+>
+> 1. Run the dependency extraction script (if not already done):
+>    ```bash
+>    ./scripts/dependency/extract_during_build.sh
+>    ```
+> 2. Copy the recommended requirements file:
+>    ```bash
+>    cp ~/audiobook/dependency_artifacts/build_analysis/recommended_requirements.in ~/audiobook/docker/sesame-tts/requirements.in
+>    ```
+> 3. Rebuild the Docker image:
+>    ```bash
+>    DOCKER_BUILDKIT=1 docker build -t sesame-tts-jetson -f ~/audiobook/docker/sesame-tts/Dockerfile ~/audiobook
+>    ```
+>
+> If you are not using Docker, you can create a virtual environment and install dependencies from the recommended file:
+> ```bash
+> python3 -m venv venv
+> source venv/bin/activate
+> pip install --upgrade pip
+> pip install -r ~/audiobook/dependency_artifacts/build_analysis/recommended_requirements.in
+> ```
+
+If you want to install dependencies manually (not recommended for Jetson), use:
+
 ```bash
-# Install system dependencies
 sudo apt update
 sudo apt install -y python3-venv python3-pip ffmpeg libsndfile1
 

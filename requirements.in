@@ -42,6 +42,7 @@ einops>=0.8.0
 # PyTorch Acceleration & Optimization libraries - NOTE: Check compatibility with torch==2.6.0
 torchao==0.1.0
 torchtune==0.3.0
+sphn==0.1.4
 
 # Triton support - Check compatibility with torch 2.6.0
 tritonclient[all]==2.55.0  # Aligns with Triton Server v2.55.0
