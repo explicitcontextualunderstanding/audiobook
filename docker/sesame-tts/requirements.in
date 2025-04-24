@@ -4,9 +4,9 @@ torchvision>=0.21.0
 torchaudio>=2.6.0,<2.7.0
 
 # Libraries with specific version requirements - using Jetson-optimized where available
+einops>=0.8.0
 vector_quantize_pytorch>=1.22.15
 #torchao>=0.11.0
-einops>=0.8.0
 triton>=3.3.0
 # torchtune is included for LLM workflows but pulls in sphn, which requires a Rust build and Opus/CMake compatibility.
 # On Jetson/ARM64, this may cause build failures due to sphn's native build requirements.
