@@ -59,10 +59,10 @@ librosa==0.10.1
 einops==0.8.0
 
 # PyTorch Acceleration & Optimization - Pinned (will likely use fallback PyPI)
-torchao==0.1.0
+#torchao==0.1.0
 
 # PyTorch Fine-tuning library - Pinned
-torchtune==0.3.0
+#torchtune==0.3.0
 
 # Model serialization (Sesame specific?) - Pinned
 moshi==0.2.2
