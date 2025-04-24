@@ -12,6 +12,7 @@ This document outlines a comprehensive plan for converting a 230-page PDF book i
 - At least 20GB of free storage space
 - Internet connection for downloading models
 - **Python 3.12 (standardizing on this version for all builds and dependencies)**
+- **Note:** Some advanced dependencies (e.g., `torchtune` for LLM workflows) may require a working Rust toolchain and CMake/Opus for native builds, especially on Jetson/ARM64. These dependencies can pull in packages like `sphn` that are not available as prebuilt wheels and must be compiled from source.
 
 ### 1.2 Clone the jetson-containers Repository
 ```bash
