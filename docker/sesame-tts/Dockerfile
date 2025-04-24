@@ -134,6 +134,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     sed -i '/sphn/d' /tmp/requirements.lock.txt && \
     sed -i '/torchao/d' /tmp/requirements.lock.txt && \
     sed -i '/torchtune/d' /tmp/requirements.lock.txt && \
+    # Remove any lines that reference sphn as a dependency of moshi (e.g., "sphn" in a VCS or subdependency line)
+    sed -i '/sphn@/d' /tmp/requirements.lock.txt && \
+    sed -i '/sphn==/d' /tmp/requirements.lock.txt && \
     source /opt/conda/bin/activate tts && \
     echo "Installing Python dependencies from lock file..." && \
     pip install --no-cache-dir --prefer-binary -r /tmp/requirements.lock.txt && \
