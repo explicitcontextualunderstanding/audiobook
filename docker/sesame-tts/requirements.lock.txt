@@ -43,7 +43,7 @@ einops==0.7.0
 rotary_embedding_torch==0.2.5
 vector_quantize_pytorch==1.8.6
 datasets==2.16.1
-torchtune==0.3.0
+#torchtune==0.3.0
 torchao==0.1.0
 # Additional requirements
 dill==0.3.7
