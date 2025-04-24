@@ -296,13 +296,37 @@ COPY --from=builder /models /models
 # Create empty directories for volumes
 RUN mkdir -p /audiobook_data /books /segments
 
-# Copy utility scripts and application files
-# These should exist in your repository structure
-COPY docker/sesame-tts/utils/audiobook_generator.py /opt/csm/ 2>/dev/null || true
-COPY docker/sesame-tts/utils/watermarking.py /opt/csm/ 2>/dev/null || true
-COPY docker/sesame-tts/utils/ /opt/utils/ 2>/dev/null || true
-COPY docker/sesame-tts/entrypoint.sh /entrypoint.sh 2>/dev/null || true
+# Copy utility scripts and application files using shell script
+RUN mkdir -p /opt/utils /opt/csm
 
+# We'll avoid copying missing files by using an install script approach
+COPY docker/sesame-tts/ /tmp/setup/
+RUN if [ -f "/tmp/setup/utils/audiobook_generator.py" ]; then \
+      cp /tmp/setup/utils/audiobook_generator.py /opt/csm/; \
+    else \
+      echo "audiobook_generator.py not found"; \
+    fi && \
+    if [ -f "/tmp/setup/utils/watermarking.py" ]; then \
+      cp /tmp/setup/utils/watermarking.py /opt/csm/; \
+    else \
+      echo "watermarking.py not found"; \
+    fi && \
+    if [ -d "/tmp/setup/utils" ]; then \
+      cp -r /tmp/setup/utils/* /opt/utils/ 2>/dev/null || true; \
+    else \
+      echo "utils directory not found"; \
+    fi && \
+    if [ -f "/tmp/setup/entrypoint.sh" ]; then \
+      cp /tmp/setup/entrypoint.sh /entrypoint.sh && \
+      chmod +x /entrypoint.sh; \
+    else \
+      echo "entrypoint.sh not found"; \
+      echo '#!/bin/bash' > /entrypoint.sh && \
+      echo 'exec "$@"' >> /entrypoint.sh && \
+      chmod +x /entrypoint.sh; \
+    fi && \
+    rm -rf /tmp/setup
+    
 # Set up environment 
 ENV PATH="/opt/tritonserver/bin:/opt/conda/bin:${PATH}" \
     MODELS_DIR=/models \
