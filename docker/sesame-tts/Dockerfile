@@ -136,10 +136,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     sed -i '/torchtune/d' /tmp/requirements.lock.txt && \
     sed -i '/sphn@/d' /tmp/requirements.lock.txt && \
     sed -i '/sphn==/d' /tmp/requirements.lock.txt && \
-    # Remove any lines that reference moshi as a VCS dependency (e.g., "moshi@ git+https://...")
     sed -i '/moshi@/d' /tmp/requirements.lock.txt && \
-    # Add a final check to remove any line containing "sphn" (catch-all)
-    sed -i '/sphn/d' /tmp/requirements.lock.txt && \
+    # Remove any lines that reference sphn or moshi as a dependency of another package (e.g., "sphn" or "moshi" in a subdependency line)
+    grep -vE '(^|\s)(sphn|moshi)([= @:]|$)' /tmp/requirements.lock.txt > /tmp/requirements.lock.txt.clean && \
+    mv /tmp/requirements.lock.txt.clean /tmp/requirements.lock.txt && \
     source /opt/conda/bin/activate tts && \
     echo "Installing Python dependencies from lock file..." && \
     pip install --no-cache-dir --prefer-binary -r /tmp/requirements.lock.txt && \
