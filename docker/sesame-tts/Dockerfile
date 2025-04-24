@@ -58,6 +58,7 @@ COPY requirements.in /tmp/requirements.in
 # If using moshi, bitsandbytes may still be pulled in as a transitive dependency.
 RUN sed -i '/silentcipher/d' /tmp/requirements.in && \
     sed -i '/bitsandbytes/d' /tmp/requirements.in && \
+    sed -i '/sphn/d' /tmp/requirements.in && \
     pip-compile --resolver=backtracking --output-file=/tmp/requirements.lock.txt /tmp/requirements.in && \
     # Verify the lock file was created
     test -f /tmp/requirements.lock.txt || (echo "Failed to generate requirements.lock.txt" && exit 1)
@@ -130,6 +131,7 @@ COPY --from=resolver /tmp/requirements.lock.txt /tmp/requirements.lock.txt
 SHELL ["/bin/bash", "-c"]
 RUN --mount=type=cache,target=/root/.cache/pip \
     sed -i '/bitsandbytes/d' /tmp/requirements.lock.txt && \
+    sed -i '/sphn/d' /tmp/requirements.lock.txt && \
     source /opt/conda/bin/activate tts && \
     echo "Installing Python dependencies from lock file..." && \
     pip install --no-cache-dir --prefer-binary -r /tmp/requirements.lock.txt && \
