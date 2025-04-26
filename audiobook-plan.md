@@ -13,6 +13,19 @@ This document outlines a comprehensive plan for converting a 230-page PDF book i
 - Internet connection for downloading models
 - **Python 3.12 (standardizing on this version for all builds and dependencies)**
 - **Note:** Some advanced dependencies (e.g., `torchtune` for LLM workflows) may require a working Rust toolchain and CMake/Opus for native builds, especially on Jetson/ARM64. These dependencies can pull in packages like `sphn` that are not available as prebuilt wheels and must be compiled from source.
+- **PyTorch AO:** [torchao](https://github.com/pytorch/ao) is a PyTorch library for model optimization and quantization. If your workflow or dependencies require `torchao`, ensure you are using a compatible version for your Jetson/ARM64 environment. Refer to the official repo for documentation and updates: https://github.com/pytorch/ao
+
+> **Tip:**  
+> When running dependency analysis or installing packages inside a Docker container, make sure you are in the correct environment and directory.  
+> For example, if you are inside `/dependency_analysis` and see files like `requirements.in` and `recommended_requirements.in`, you can install dependencies with:
+> ```bash
+> pip install -r recommended_requirements.in
+> ```
+> or
+> ```bash
+> pip install -r requirements.in
+> ```
+> If you use Conda, ensure you initialize Conda in your shell with `conda init` before activating environments.
 
 ### 1.2 Clone the jetson-containers Repository
 ```bash

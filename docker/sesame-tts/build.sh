@@ -86,6 +86,16 @@ pip install --no-cache-dir --prefer-binary \
     --extra-index-url https://pypi.org/simple \
     -r requirements.txt
 
+# Install recommended requirements if present
+if [ -f /home/amazon1148/audiobook/dependency_artifacts/build_analysis/recommended_requirements.in ]; then
+  echo "📦 Installing recommended requirements from dependency analysis..."
+  pip install --no-cache-dir --prefer-binary \
+    --index-url https://pypi.jetson-ai-lab.dev/simple \
+    --extra-index-url https://pypi.ngc.nvidia.com \
+    --extra-index-url https://pypi.org/simple \
+    -r /home/amazon1148/audiobook/dependency_artifacts/build_analysis/recommended_requirements.in
+fi
+
 # Force reinstall moshi to ensure correct version
 pip install --force-reinstall --no-cache-dir --prefer-binary \
     --index-url https://pypi.jetson-ai-lab.dev/simple \

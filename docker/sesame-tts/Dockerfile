@@ -66,7 +66,7 @@ COPY requirements.in /tmp/requirements.in
 # - Rust compilation requirements (when Rust may not be properly configured)
 # - ARM64 compatibility issues
 # - PyTorch version conflicts
-RUN grep -v -E '(silentcipher|bitsandbytes|sphn)' /tmp/requirements.in > /tmp/requirements.clean.in && \
+RUN grep -v -E '(silentcipher|bitsandbytes|sphn|torchao|torchtune)' /tmp/requirements.in > /tmp/requirements.clean.in && \
     mv /tmp/requirements.clean.in /tmp/requirements.in && \
     cat /tmp/requirements.in && \
     # Generate the lock file with backtracking resolver for better dependency resolution

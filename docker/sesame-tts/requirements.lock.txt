@@ -39,7 +39,7 @@ cryptography==41.0.5
 charset-normalizer==3.3.0
 
 # Utilities & optimizers
-einops>=0.8.0
+einops>=0.8.1
 vector_quantize_pytorch>=1.22.15
 # Additional requirements
 dill==0.3.7
